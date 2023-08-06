@@ -1,0 +1,738 @@
+\begin{introduction}
+    \item 基本类型
+    \item \lstinline!sizeof! 函数
+    \item 字面量
+    \item 变量
+    \item 名字
+    \item 关键字
+    \item 阐述关键字
+    \item 作用域
+    \item 存储期
+    \item 可变性
+    \item 别名
+    \item 复合类型
+\end{introduction}
+
+
+\section{基本类型}
+
+AutoScript 中内置了下面几种\textbf{基本类型（Fundamental Type）}：
+
+\begin{itemize}
+    \item \lstinline!Int!：整数类型，表示特定范围内的整数。
+    \item \lstinline!Real!：实数类型，表示特定范围内的实数，是双精度浮点数类型。
+    \item \lstinline!String!：字符串类型，表示一段文本内容。
+    \item \lstinline!Byte!：字节类型，表示一个字节。
+    \item \lstinline!Void!：空类型，没有任何信息。也可以写成 \lstinline!()!。
+    \item \lstinline!Type!：类型的类型，表示一个类型。
+\end{itemize}
+
+大多数其它类型都是建立在这些基本类型上的。基本类型的特征是它们有比较清晰和原子的内存结构，下面是这些类型占用的内存大小：
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|c|c|} \hline
+        \lstinline!Int! & 8 字节  \\\hline
+        \lstinline!Real! & 8 字节 \\\hline 
+        \lstinline!String! & 24 字节 \\\hline
+        \lstinline!Byte! & 1 字节 \\\hline
+        \lstinline!Void! & 0 字节 \\\hline
+        \lstinline!Type! & 8 字节 \\\hline
+    \end{tabular}
+    \caption{基本类型的大小}
+    \label{tab:sizeof-fundamental-type}
+\end{table}
+
+我们可以用内置的 \lstinline!sizeof! 函数来得到类型的内存占用。
+
+\begin{lstlisting}
+const main = func () -> do {
+    print sizeof(Int);      // 输出 8
+    print sizeof(Void);     // 输出 0
+};
+\end{lstlisting}
+
+由于 \lstinline!Int! 和 \lstinline!Real! 类型的大小有限，因此它们只能表示特定范围的数，当试图让其持有超过界限的数时，会产生错误。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto err1 : Int = 10^100;       // 编译期错误，10^100 的结果无法放入一个 Int 变量中
+    scan err2 : Int;                // 输入 10'000'000'000，运行期错误
+};
+\end{lstlisting}
+
+可能令你疑惑的是，字符串的长度明明多不相同，但 \lstinline!String! 却能有确定的大小。这是因为 \lstinline!String! 和其它基本类型不同，它拥有一层 \textbf{间接性（Indirection）}，我们直接访问到的是其信息实际存储地址的句柄。具体的内容我们会在引用类型的小节中说明。 \\
+
+对其它语言有一些了解的读者可能发觉上面这些基本类型并不够用，比如没有表示真假的 \lstinline!Bool! 类型，以及没有空间高效的短整数和单精度浮点数。这些类型都放在 \lstinline!Prelude! 库中，它们的定义如下（我省去了它们名字中的 \lstinline!Prelude!）：
+
+\begin{itemize}
+    \item \lstinline!Bool!：1 字节的布尔类型，只有两个可能的值：\lstinline!True! 和 \lstinline!False!。
+    \item \lstinline!BigInt!：是 8 字节的无限整数类型，（理论上）可以存储任意大的整数。
+    \item \lstinline!Int64!：是 \lstinline!Int! 的\emph{别名}。
+    \item \lstinline!Int32!：4 字节的短整数类型。
+    \item \lstinline!Int16!：2 字节的短整数类型。
+    \item \lstinline!Int8!：1 字节的短整数类型。
+    \item \lstinline!BigReal!：是 8 字节的无限精度实数类型，（理论上）可以存储任意的有理数。
+    \item \lstinline!Real64!：是 \lstinline!Real! 的\emph{别名}。
+    \item \lstinline!Real32!：4 字节的单精度浮点数类型。
+\end{itemize}
+
+值得特别说明的是不同类型之间的\emph{兼容性}。从直觉来看，一个整数总能无损失地转换成一个实数，但考虑到精度，一些过大的整数显然不能顺利地变成实数；不过，低精度的整数或实数显然可以安全地转换成对应的高精度类型。 \\
+
+AutoScript 中用两个名词来描述这两种情况的类型转换，对于总是安全的类型转换，其名称为\textbf{隐式类型转换（Implicit Type Conversion）}。正如其字面暗示的，编译器会自动为你做合适的转换；剩余的则是\textbf{显式类型转换（Explicit Type Conversion）}，我们必须用某种方式告知编译器这个转换的确是我们的意图。
+
+\begin{lstlisting}
+cons main = func () -> do {
+    auto x : mut Int = 42;
+    auto y : mut BigInt = 0;
+    y <- x;             // 进行了隐式类型转换
+    x <- y as Int;      // 进行了显式类型转换，如果省略 as BigInt 会出现编译错误
+};
+\end{lstlisting}
+
+上面出现的 \lstinline!as! 运算符会调用特定类型的\emph{构造函数}来构建目标类型的对象。值得一提的是，初始化变量时 \lstinline!=! 右侧的表达式只能经过隐式转换变为声明的类型。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x : Int = 42 as BigInt;    // 编译错误，右侧表达式的类型 BigInt 无法隐式转换为 x 声明的 Int 类型
+};
+\end{lstlisting}
+
+一些类型之间不存在类型转换，比如 \lstinline!Int! 和 \lstinline!String!。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x = 42；
+    auto y = "abc";
+    x <- y as Int;      // 编译错误
+    y <- x as String;   // 编译错误
+};
+\end{lstlisting}
+
+这是因为两者间不存在显然的转换关系：\lstinline!"123abc"! 如何转换成整数？反过来 \lstinline!1e8! 应该转换成什么格式的字符串？因此更好的方法是借用函数丰富的参数列表来自定义转换时的行为。\lstinline!Prelude! 中提供了 \lstinline{as_string} 和 \lstinline{as_real} 等函数用于这些类型间的转换。
+
+\begin{lstlisting}
+const main = func () -> do {
+	auto x = 42;
+	auto y = x.as_string();
+};
+\end{lstlisting}
+
+\section{字面量}
+
+\textbf{字面量（Literal）}是指类似于 \lstinline!42! 这样从字面上就能理解其值的结构。在 AutoScript 中，字面量的类型主要有下面几种：
+
+\begin{itemize}
+    \item 整数字面量：表示一个整数，主要有下面四种形式：
+    \begin{itemize}
+        \item 十进制整数：以数字组成的字面量，如 \lstinline!42!。
+        
+        \item 十六进制整数：以 \lstinline!0x! 开头的，包含所有数字和 \lstinline!A-F! 的字母的字面量，比如 \lstinline!0xCAFE!。
+
+        \item 二进制整数：以 \lstinline!0b! 开头的，包含数字 \lstinline!0! 或 \lstinline!1! 的字面量，比如 \lstinline!0x110!。
+    \end{itemize}
+
+    \item 实数字面量：表示一个实数，主要有下面几种形式：
+    \begin{itemize}
+        \item 包含一个小数点，且小数点两边都是整数字面量，如 \lstinline!1.23!。
+
+        \item 包含一个指数标识符 \lstinline!e! 或 \lstinline!E!，标识符左侧是一个整数或实数字面量，右侧是一个整数字面量，如 \lstinline!1e10!。
+    \end{itemize}
+
+    \item 字符串字面量：表示一个字符串，由一对双引号 \lstinline!"! 作为边界的字面量。
+
+    \item 原始字符串字面量：表示一个字符串，由三对双引号作为边界的的字面量。
+
+    \item 字节字面量：表示一个字节，由一对单引号 \lstinline!'! 作为边界的字面量。
+
+    \item 空字面量：即 \lstinline!()!，表示一个 \lstinline!Void! 类型的对象。注意到 \lstinline!()! 同时也是它的类型。
+
+    \item 特殊字面量：包括 \lstinline!default!、\lstinline!otherwise! 和 \lstinline!undefined!。它们没有类型，只一个占位符；编译器会适宜地处理它们。
+
+    \item 自定义字面量：本质上还是整数、实数或字符串字面量；不过在字面量的最后会加上一个\emph{后缀}，实际效果等同于一个函数调用，比如 \lstinline!123m!。
+\end{itemize}
+
+值得特别说明的是字符串字面量。AutoScript 中的字符串支持\textbf{转义字符（Escape Character）}，这是一些因为特殊原因不能在字符串中直接写出来的字符：
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{l c l c l c}
+        新一行 & \lstinline!\n! & 水平制表符 & \lstinline!\t! & 单引号 & \lstinline!\'! \\
+        垂直制表符 & \lstinline!\v! & 退格 & \lstinline!\b! & 美元符号 & \lstinline!\$! \\
+        反斜杠 & \lstinline!\\! & 响铃 & \lstinline!\a! & Unicode 符号 & \lstinline!\u! \\
+        回车 & \lstinline!\r! & 双引号 & \lstinline!\"! & Unicode 符号 & \lstinline!\x! \\
+    \end{tabular}
+    \caption{转义字符}
+    \label{tab:escape-characters}
+\end{table}
+
+其中，Unicode 符号 \lstinline!\u! 后需要接一个八进制整数字面量，而 \lstinline!\x! 后需要接一个十六进制整数字面量。如果两者的位数过长（\lstinline!\u! 最多接受三位，\lstinline!\x! 最多接受四位），则只会取前面几位。 \\
+
+字符串字面量支持\textbf{插值（Interpolation）}，即在字符串中使用一个表达式。可以通过符号 \$ 和圆括号来引入一个表达式。表达式中不能再次出现字符串字面量。
+
+\begin{lstlisting}
+const main = func () -> do {
+    print "Enter your name: ";
+    scan name : String;
+    print "Hello, $(name)";
+};
+\end{lstlisting}
+
+所有的基本类型都可以进行插值。后面结构章节中我们再介绍如何让自定义的类型也能插值到字符串中。 \\
+
+接下来让我们讨论\textbf{原始字符串（Raw String）}。在原始字符串中，所有常规的转义字符都不再生效：字符串中出现了什么就代表什么。字符串插值依然有效，不过这里 \$ 的转义字符变成了 \$\$。即我们要通过 \$\$ 来表示一个美元符号。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x = 42;
+    auto raw = 
+    """
+    A new line indented once.
+        Tabbed twice.
+    Interpolation is supported: x = $(x).
+        $$ is for a single dollar symbol.
+    """;
+};
+\end{lstlisting}
+
+
+\section{变量}
+
+\textbf{变量（Variable）}是 AutoScript 程序的基石。定义变量时，我们将一个\textbf{实体（Entity）}绑定到一个名字上面，此后这个名字就代表了一个变量。在不引起混淆的情况下，我们会用“变量”一词来同时指它的名字和绑定的对象。
+
+\subsection{变量的声明}
+
+变量的声明结构比较复杂，这里让我们先介绍其中最简单的部分。
+
+\begin{grammar}[变量声明 \texttt{[simple-var-decl]}] \label{grm:variable-declaration-basics}
+\begin{enumerate}
+	\item \texttt{[storage-spec]} \texttt{[var-name]} \lstinline!:! \texttt{[type-spec]} \lstinline!=! \texttt{[expr]}
+	\item \texttt{[storage-spec]} \texttt{[var-name]} \lstinline!:! \texttt{[type-spec]}
+	\item \texttt{[storage-spec]} \texttt{[var-name]} \lstinline!=! \texttt{[expr]}
+\end{enumerate}
+\end{grammar}
+
+注意变量声明的结构之后需要接一个分号才能形成一个完整的语句（即声明语句）。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x : Int = 42;
+    auto y : Int;
+    auto z = 42;
+};
+\end{lstlisting}
+
+上面的例子中，\lstinline!x!、\lstinline!y!、\lstinline!z! 的声明方式分别对应了语法 \ref{grm:variable-declaration-basics} 中的三种格式。下面来详细说明三者的异同：
+
+\begin{enumerate}
+    \item \lstinline!x! 经过初始化且类型是显式给出的，此时编译器会忠实地将 \lstinline![type-spec]! 作为 \lstinline!x! 的类型，并尝试将 \lstinline![expr]! 的值隐式类型转换为这个类型。如果转换失败，则会产生编译错误。
+
+    \item \lstinline!y! 没有初始化，因此它只是一个\textbf{提前声明（Forward Declaration）}。程序执行到这里时不会为 \lstinline!y! 分配内存，相当于用 \lstinline!undefined! 为其初始化。
+
+    \item \lstinline!z! 经过了初始化但没有显式给出类型。此时 AutoScript 会利用\textbf{类型推断（Type Inference）}来决定 \lstinline!z! 的类型。这里由于初始化表达式是 \lstinline!Int! 类型的字面量，因此显然 \lstinline!z! 的类型是 \lstinline!Int!。
+\end{enumerate}
+
+下面让我们详细介绍有关提前声明的知识。所有不是提前声明的变量声明都称为\textbf{定义（Definition）}。一个程序中只允许出现某个变量被定义一次，但它可以出现多次提前声明。所有声明应该是\emph{兼容}的；具体地说，无论提前声明如何，需要保证变量在定义处显式给出或推断出的类型是每个提前声明处类型的\emph{子类型} \footnote{有关子类型将会在结构的章节中详细讲解，这里可以先给出其定义：如果类型 \lstinline!A! 可以出现的地方 \lstinline!B! 也能出现，则后者是前者的子类型。}。 \\
+
+需要提前声明的原因其实不难理解：在没有定义变量时，如果需要利用到这个变量，则至少要让编译器知道它的类型信息，从而方便提前进行类型推断。真正使用到这个变量时，需要保证其实际功能要强于提前声明处的类型声明，因此前者应是后者的子类型。让我们用一个例子来了解提前声明的作用：
+
+\begin{lstlisting}
+const b : Int -> Int;
+// a_n = b_n + b_{n-1}
+// a_0 = 0
+const a = func (n : Int) -> do {
+    if (n == 0) {
+        return 0;
+    }
+    return b(n) + b(n-1);		// 通过提前声明确认这是 Int 类型
+};
+// b_n = a_n - a_{n-1}
+// b_0 = 0
+const b = func (n : Int) -> do {
+    if (n == 0) {
+        return 0;
+    }
+    return a(n) - a(n-1);
+};
+\end{lstlisting}
+
+上面的例子中，函数 \lstinline!a! 和 \lstinline!b! 之间需要相互调用，因此必定需要有一方被提前声明。在 \lstinline!b! 被提前声明后，编译器就知晓了它的类型，因此在 \lstinline!a! 的 \lstinline!return! 语句中可以推断出 \lstinline!a! 的返回类型。这里值得对 AutoScript 中的类型推断机制进一步说明。 \\
+
+AutoScript 拥有强大的静态类型系统，因此在编译期可以得知大部分变量的类型信息。根据这些类型信息我们可以推断出表达式的类型（比如 \lstinline!1 + 1! 的类型显然也是 \lstinline!Int!），因此不仅对象的类型可以通过字面量来推断得知，函数的类型也可以通过函数中表达式的组合来推断出来。凭借类型推断，许多地方我们并不需要写出变量的类型 \footnote{一些来自于静态类型语言的读者可能不习惯广泛利用类型推断，但这并非洪水猛兽：在现代 IDE 或语言分析插件的助力下，我们可以尽管将背后交给类型推断系统。}。
+
+
+\subsection{名字与作用域}
+
+变量的一个重要属性就是它的\textbf{名字（Name）}。不过，并非所有名字都是合法的：AutoScript 保留了一些名字用作语法标记，这些名字称为\textbf{关键字（Keyword）}。下面的几张表分类罗列了 AutoScript 中所有的关键字。 \\
+
+首先是用作程序流程控制的关键字：
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|c|c|c|} \hline
+        \lstinline!assert!  & \lstinline!continue!& \lstinline!for!		& \lstinline!print!		& \lstinline!throw!	& \lstinline!yield! \\
+        \lstinline!assume!  & \lstinline!do!      & \lstinline!guard!   & \lstinline!requires!  & \lstinline!try! 	& \lstinline!!  \\
+        \lstinline!break!   & \lstinline!delete!  & \lstinline!if!   	& \lstinline!return!  	& \lstinline!where! & \lstinline!! \\
+        \lstinline!case!    & \lstinline!else!    & \lstinline!match!   & \lstinline!scan! 		& \lstinline!while! & \lstinline!! \\
+        \lstinline!catch!   & \lstinline!fall!    & \lstinline!monad!	& \lstinline!then!   	& \lstinline!with! 	& \lstinline!! \\\hline
+    \end{tabular}
+    \caption{控制流关键字}
+    \label{tab:control-keywords}
+\end{table}
+
+其次是用作函数或运算符的关键字：
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|c|c|c|} \hline
+        \lstinline!addrof!  & \lstinline!bitor!     & \lstinline!exceptof!	& \lstinline!keyof! & \lstinline!of! 		& \lstinline!shr!     \\
+        \lstinline!and!     & \lstinline!decay!     & \lstinline!hasbase!  	& \lstinline!kindof!& \lstinline!or! 		& \lstinline!tagof!      \\
+        \lstinline!as!      & \lstinline!decayof!   & \lstinline!hasclass!  & \lstinline!nameof!& \lstinline!protoof! 	& \lstinline!templof!  \\
+        \lstinline!bitand!  & \lstinline!deref!     & \lstinline!in!    	& \lstinline!next!  & \lstinline!sizeof! 	& \lstinline!typeof! \\
+        \lstinline!bitnot!  & \lstinline!derefof!   & \lstinline!instof!    & \lstinline!not!   & \lstinline!shl! 		& \lstinline!xor! \\\hline
+    \end{tabular}
+    \caption{运算符/函数关键字}
+    \label{tab:operator-keywords}
+\end{table}
+
+然后是作为“语法胶水”的阐述关键字，这些关键字都可以被特定符号代替：
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|} \hline
+        \lstinline!alias!（\texttt{\$}）   & \lstinline!equals!（\lstinline!=!） & \lstinline!object!（\lstinline!#=!）  \\
+        \lstinline!auto!（缺省）	& \lstinline!from!  & \lstinline!static!（\lstinline!'!） \\
+        \lstinline!class!（\lstinline!?=!）   & \lstinline!func!（\lstinline!\!） & \lstinline!struct!（\lstinline!#!）  \\
+        \lstinline!const!（\lstinline|!|）   & \lstinline!is!（\lstinline!?!） 	& \lstinline!thread!  \\
+        \lstinline!data!（\lstinline!%!）   & \lstinline!new!（\lstinline!^!）	& \lstinline!type!（\lstinline!:!）  \\\hline
+    \end{tabular}
+    \caption{阐述关键字}
+    \label{tab:elaborator-keywords}
+\end{table}
+
+随后是一些不能被符号替代的关键字：
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|c|c|} \hline
+        \lstinline!atom!    & \lstinline!except!    & \lstinline!internal!	& \lstinline!mut! 		& \lstinline!undefined!  \\
+        \lstinline!await!   & \lstinline!export!    & \lstinline!lazy!     	& \lstinline!otherwise! & \\
+        \lstinline!comptime!& \lstinline!extend!    & \lstinline!local!     & \lstinline!private! & \\
+        \lstinline!default! & \lstinline!import!    & \lstinline!missing! 	& \lstinline!ref! & \\
+        \lstinline!dyn!     & \lstinline!infer!  	& \lstinline!move!   	& \lstinline!this! & \\\hline
+    \end{tabular}
+    \caption{其它关键字}
+    \label{tab:other-keywords}
+\end{table}
+
+除此之外还有一些只在特定上下文中有特殊含义的\textbf{上下文关键字（Context Keyword）}。
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|} \hline
+        \lstinline!branch!    & \lstinline!loop! \\
+        \lstinline!excluding! & \\
+        \lstinline!including! & \\
+        \lstinline!intrinsic! & \\
+        \lstinline!iteration! & \\\hline
+    \end{tabular}
+    \caption{上下文关键字}
+    \label{tab:context-keywords}
+\end{table}
+
+最后，所有包含两个连续下滑线的名字都是\textbf{保留字（Reserved Word）}，它们会用作编译器生成的代码。虽然定义这样的变量不一定发生错误，但可能会让程序有未定义行为。 \\
+
+和变量息息相关的一个语言特性是\textbf{作用域（Scope）}。所有出现大括号的地方都会引入一个新的作用域。作用域内部可以无障碍地访问外面定义的变量，但反过来通常不行。不同的作用域中可以定义相同名字的变量；特别地，如果在内部作用域定义和外部相同名字的变量，则会发生\textbf{变量覆盖（Variable Hiding）}，此时在内部作用域中只能访问内部定义的变量。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x = 42;
+    {
+        print x;        // 输出 42
+        auto x = 24;
+        print x;        // 输出 24
+    }
+    print x;            // 输出 42
+};
+\end{lstlisting}
+
+每个变量都处于一个作用域当中。最外面的作用域被称为\textbf{全局作用域（Global Scope）}，函数体中出现的任何作用域都被称为\textbf{局部作用域（Local Scope）}。除此之外的作用域我们暂时不会遇到，因此暂不详述了。 \\
+
+之所以不同作用域中可以定义同名的变量，是因为编译器对每个名字进行了特殊的处理。全局作用域的名字不会有任何改变，但以 \lstinline!main! 函数中的变量为例，\lstinline!x! 会被改写成 \lstinline!::main::unnamed0::x!，而内部作用域中的 \lstinline!x! 会被改写成 \lstinline!::main::unnamed0::unnamed1::x!。这些名字之间显然没有冲突。我们会在名字空间的章节中详细介绍这个特性。
+
+\subsection{存储期}
+
+本节让我们介绍 AutoScript 中的一个重要语言特性，即变量的\textbf{存储期（Storage Duration）}。它决定了变量的生命周期，即什么时候被分配内存，以及什么时候被释放。有下面几种存储期：
+
+\begin{itemize}
+    \item 自动存储期：用关键字 \lstinline!auto! 表示。在变量定义时分配内存 \footnote{实际上变量在\emph{栈}上的内存在函数开始时就已经全部分配好了，不过由于它没有初始化，因此其在\emph{堆}上的内存空间需要在变量定义处分配。} 并初始化，并在作用域结尾处释放内存。
+
+    \item 静态存储期：用关键字 \lstinline!static! 表示。在程序开始时分配内存，在变量定义时初始化，并在程序结束时释放内存。
+
+    \item 常量存储期：用关键字 \lstinline!const! 表示。在编译时分配内存并初始化，有时会被编译器优化掉。
+
+    \item 动态存储期：用关键字 \lstinline!new! 表示。在变量定义时分配内存并初始化，并需要手动通过 \lstinline!delete! 函数释放内存。
+\end{itemize}
+
+从习惯上来讲，函数体中大多数的变量都应拥有自动存储期，这是最简单且安全的方法；静态存储期适用于存储某个状态；常量存储期适用于声明函数和类型，以及元编程，是最高效但局限性强的；动态存储期则适用于动态类型编程，是最灵活但却不够高效的。下面给出一些使用的例子。
+
+\begin{lstlisting}
+const store = func (x : Int) -> do {
+    static res : mut Int = 0;
+    res <- res + x;
+    return res;
+};
+const main = func () -> do {
+    print store(1);     // 输出 1
+    print store(2);     // 输出 3
+};
+\end{lstlisting}
+
+这个例子中，我们在函数 \lstinline!store! 中定义了静态变量 \lstinline!res!，它只会在第一次遇到时初始化，此后会在多次调用间保持一致。
+
+\begin{lstlisting}
+const compile_time_add = func (const x : Int, const y : Int) -> x + y;
+const main = func () -> do {
+    print compile_time_add(1, 2);       // 输出 3，但这个值在编译期就可以算出来
+};
+\end{lstlisting}
+
+这个例子中，我们了解到 \lstinline!const! 用来修饰函数的参数类型时，可以让函数在编译期计算出结果 \footnote{事实上即使没有将它声明为 \lstinline!const!，开启优化后的编译器依然会尽己所能将其提前到编译器进行运算，不过如果主动标上 \lstinline!const! 则可以在编译期执行许多常量计算的检查，以\emph{确保}它一定能在编译器计算出来。}。
+
+\subsection{可变性}
+
+此前我们就已经提到过，AutoScript 中所有的变量都默认不可变，因此为了能够更改某个变量，我们需要用到类型修饰符 \lstinline!mut!。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x = 42;
+    auto y : mut Int = 42;
+    x <- 24;                // 编译错误，x 不可变
+    y <- 24;                // 没问题
+};
+\end{lstlisting}
+
+不过，实际上有一个更加简单的方式定义可变的变量，只需在表达式上直接用 \lstinline!mut! 修饰即可。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x = mut 42;
+    x <- 24;
+};
+\end{lstlisting}
+
+AutoScript 致力贯彻声明和结构等价的语法，因此一个类型的构建方式（表达式形式）基本上都能对应它的类型语法。上面的例子中，虽然 \lstinline!x! 的类型是 \lstinline!mut Int!，但我们可以用 \lstinline!Int! 为它赋值。这实际上展示了 AutoScript 中定义和赋值的巨大区别：定义时类型推断会忠实地遵守初始化表达式的类型，但赋值时会拥有更灵活的行为；这样的区别也是 AutoScript 采用不同符号表示这两个操作的原因之一 \footnote{绝大多数其它语言都让定义（初始化）和赋值使用相同的符号，这在一些情况下会引起概念上的困惑。比如 C++ 中的内存分配、初始化和赋值实际上是三件事情，但都融合到一个符号 \lstinline!=! 上，这不容易在深入探究时缕清它们的关系。}。
+
+\subsection{别名}
+
+\textbf{别名（Alias）}是一类特殊的名字，通过关键字 \lstinline!alias! 声明，它们不属于实体，因为它们不会得到任何内存空间。从定义完毕之后，它们在任何时候都与其引用的名字性质相同。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x = 42;
+    auto y = mut 42;
+    alias also_x = x;       // also_x 是 x 的别名
+    alias also_y = y;       // also_y 是 y 的别名
+    also_x <- 24;           // 编译错误，also_x (aka x) 是不可变类型
+    also_y <- 24;
+    print y;                // 输出 24
+};
+\end{lstlisting}
+
+除了为绑定在对象上的变量起别名外，我们也可以为函数和类型起别名。
+
+\begin{lstlisting}
+const main = func () -> do {
+    alias MyInt = Int;
+    auto x : MyInt = 42;
+};
+\end{lstlisting}
+
+别名可以用来简写一些冗长的名字，且在宏编程中有重要的作用，这里不详述了。
+
+
+\section{复合类型}
+
+从基本类型出发，我们可以定义复合类型。AutoScript 中提供了丰富的复合类型的定义方式，包括元组类型、选择类型、延展类型等。下面让我们一一介绍。
+
+\subsection{元组与数组}
+
+\textbf{元组（Tuple）}可以通过逗号运算符构造，它是一系列元素的连续排列。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto tup = 42, "abc";
+    print typeof(tup);      // Int, String
+};
+\end{lstlisting}
+
+这里我们使用了函数关键字 \lstinline!typeof! 来得到变量 \lstinline!tup! 的类型。可以看到，元组的类型和它构造的结构是完全相同的，因此很好理解。不过，在实际使用时，通常会为元组的两侧添上一对圆括号。这是因为逗号运算符的优先级很低，因此容易受到其它运算符的干扰。 \\
+
+元组上定义了一些实用的方法，简单说明如下：
+
+\begin{itemize}
+    \item \lstinline!size!：得到元组中元素的个数。
+
+    \item \lstinline![]!：元组可以对\emph{查询结构}进行调用，用来访问元组中特定位置的元素。
+
+    \item \lstinline!types!：得到元组中每个元素类型组成的数组。
+\end{itemize}
+
+下面是一个示例：
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto tup = (42, "abc");
+    print tup.size();       // 输出 2
+    print tup[1];           // 输出 abc
+    print tup.types()[0];   // 输出 Int
+};
+\end{lstlisting}
+
+\textbf{数组（Array）}是元组中的特例：当元组中所有元素的类型都相等时，我们就得到了一个数组。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto arr = (1, 2, 3);   // 长度为 3 的数组
+    print typeof(arr);      // 输出 Int, Int, Int
+};
+\end{lstlisting}
+
+不过，这样的设计会让数组类型变得非常冗长（想象一下长度为 1024 的数组）。因此在 \lstinline!Prelude! 中定义了类型对索引结构的调用函数。我们只需要用 \lstinline!T[N]! 来表示长度为 \lstinline!N! 的 \lstinline!T! 数组即可。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto arr : Int[8];
+    auto ct = mut 8;
+    while (ct > 0) {
+        ct <- ct - 1;
+        print "Enter the next number, $(ct) left: ";
+        scan arr[7-ct];
+    }
+    print arr;
+};
+\end{lstlisting}
+
+和所有其它对象一样，元组在默认情况下也是不可变的。利用查询结构得到的元组中的元素也是不可变的。如果想要修改元组，可以将其声明为 \lstinline!mut!。
+
+\begin{lstlisting}
+const main = func () -> do {
+	auto tup = mut (1, 2);
+	tup[0] <- 42;
+	print typeof(tup);			// 输出 mut (Int, Int)
+	print typeof(tup[0]);		// 输出 mut Int
+};
+\end{lstlisting}
+
+对于元组类型，对其使用 \lstinline!mut! 修饰符后，它的元素都将拥有 \lstinline!mut! 的性质，因此上面的 \lstinline!tup[0]! 的类型是 \lstinline!mut Int!，这也被称为 \lstinline!mut! 的传递性。 \\
+
+一个可变元组类型中不可能包含不可变的元素，不过反过来是可以的，比如我们可以声明类型为 \lstinline!(Int, mut Int)! 的对象 \footnote{这一点可以理解成，如果元组本身是可变的，则其中某个元素根本无法保证不可变性（可以通过覆写整个元组来修改某个元素）；但一个不可变对象的局部完全可以是可变的（只需要保证其它的部分不可变即可）。}。
+
+元组类型的大小理论上是所有元素大小的和，但考虑到\emph{内存对齐}的因素，其大小实际上通常是 \lstinline!8! 的倍数。
+
+\begin{lstlisting}
+const main = func () -> do {
+    print sizeof(Int, String);      // 输出 32
+    print sizeof(Byte, String);     // 输出 32
+    print sizeof(Byte, Byte);       // 输出 2
+};
+\end{lstlisting}
+
+有关内存对齐的内容让我们在后期章节再详述。
+
+\subsection{选择}
+
+选择类型是一种多选其一的类型，这样的变量在每一时刻都是多种类型中的一个。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto int_or_str : Int | String = 42;
+    print typeof(int_or_str);           // 输出 Int | String
+    print tagof(int_or_str);            // 输出 Int
+};
+\end{lstlisting}
+
+这里用到的 \lstinline!tagof! 函数关键字是用来判断选择类型变量的实际类型的，也称为\textbf{标签（Tag）}。选择类型中的任一个标签都可以被隐式转换为前者，但反过来需要进行显式转换。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto int_or_str : Int | String = 42;    // 隐式类型转换
+    print int_or_str as Int;                // 显式类型转换且成功
+    print int_or_str as String;             // 运行错误，标签与实际不符合。
+};
+\end{lstlisting}
+
+可以看到，有关选择类型的标签错误是一个运行错误，这是因为编译器无法准确判断选择类型究竟拥有哪个标签。比如看下面的例子：
+
+\begin{lstlisting}
+import Math;
+
+const f = func (x : mut Int | String) -> do {
+    auto flag = Math.randflag();
+    if (flag) {
+        x <- "abc";
+    }
+    print tagof(x);
+};
+\end{lstlisting}
+
+在函数 \lstinline!f! 中，首先我们接受了一个选择类型的参数，此时可以根据调用处的情况来分类为输入 \lstinline!Int! 和 \lstinline!String! 的两种情况 \footnote{类似于 C++ 中的全特化模版函数，不过这样会增加程序的二进制大小。}。但在函数中，我们根据一个随机值来判断是否为 \lstinline!x! 赋值为 \lstinline!String! 标签，这就让可能的情况再次一分为二。程序中，类似这样的语句还有很多，因此没有一个简单高效的方式在编译期判断选择类型的标签。 \\
+
+选择类型中标签的顺序不影响其最终的类型，这是理所当然的。实际上，编译器会为所有类型进行某种排序，使得其标注的选择类型中的标签符合特定的顺序 \footnote{可以认为编译器采用辞典顺序排序，因此 \lstinline!String | Int! 会被正规化为 \lstinline!Int | String!。}。 \\
+
+如果为选择类型使用 \lstinline!mut! 修饰符，则其中无论是任何标签都是可变的；如果只想让某个标签可变，可以单独为其使用 \lstinline!mut! 修饰符。背后的原因和元组类似。 \\
+
+选择类型的大小是其标签中最大的类型大小。
+
+\begin{lstlisting}
+const main = func () -> do {
+    print sizeof(Int | String);			// 输出 24
+    print sizeof(Byte | Int);           // 输出 8
+};
+\end{lstlisting}
+
+
+\subsection{延展}
+
+\textbf{延展（Extension）}是多种类型并兼的构造形式，即一个类型同时是多种类型的任一个。某种程度上可以理解成这些标签共同的子类型。延展类型对象可以通过合取运算符 \lstinline!&! 来构造。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto int_and_str = 42 & "abc";
+    print typeof(int_and_str);      // 输出 Int & String
+};
+\end{lstlisting}
+
+延展类型是一个编译期就能充分了解的类型，它可以隐式转换成组成自身的任一种类型。不过，反过来从某种类型转换成它的延展类型只能通过合取运算符来完成。
+
+\begin{lstlisting}
+const main = func () -> do {
+    alias IntStr = Int & String;
+    auto err : IntStr = 42;         // 编译错误，Int 类型无法隐式转换成 Int & String 类型
+    auto int_str_1 : IntStr = 42 & default;     // 没问题，String 部分通过 default 初始化
+    auto int_str_2 : IntStr = default & default;// 没问题，两个部分都通过 default 初始化
+    auto int_str_3 : IntStr = default;          // 没问题，所有部分都通过 default 初始化
+    auto int : Int = int_str_1;     // 没问题
+};
+\end{lstlisting}
+
+延展类型能够隐式转换为某个标签的特性使其能支持智能的调用语法。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto tup_str = (1, "abc") & "def";
+    print tup_str.types()[0];       // 输出 Int
+    print tup_str.substr(1);        // 输出 ef
+    print tup_str.size();           // 编译错误：Int, String 和 String 上都定义了 size 方法
+    print (tup_str as (Int, String)).size();    // 输出 2
+    print (tup_str as String).size();           // 输出 3
+};
+\end{lstlisting}
+
+有关其中的运作机理，我们会在函数章节中详细说明。延展类型的大小和元组类型有相同的计算方法，同时其受 \lstinline!mut! 修饰时的性质和元组也类似。
+
+
+\subsection{引用}
+
+AutoScript 中支持\textbf{引用（Reference）}。这种类型的变量存储的是其它变量的地址，从而能够在函数间传递时依然持有引用目标的句柄。引用通过引用运算符 \lstinline!ref! 构造。更通俗地解释，我们可以认为每个变量都有一个独特的编号，程序中可以通过编号访问它对应的变量。引用存储的正是这个编号。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x = mut 42;
+    auto r = ref x;
+    print typeof(r);        // 输出 ref mut Int
+    r <- 24;
+    print x;                // 输出 24
+};
+\end{lstlisting}
+
+上面的代码中出现了神奇的景象：明明 \lstinline!r! 的类型是 \lstinline!ref mut Int!，为什么可以通过 \lstinline!Int! 对其赋值？实际上，编译器在处理赋值操作时会对两边的类型进行判断：如果左侧是一个引用类型，则会尝试将右侧的类型隐式转换成左侧引用的类型。如果成功则会将左侧\emph{解引用}为引用的变量，然后进行赋值操作。 \\
+
+至此就会出现一个有趣的现象：即使一个变量不是可变的，它依然可以进行赋值操作，因为它可能是一个可变对象的引用。下面用一张表来展示对于类型 \lstinline!T!，它和它的引用在使用可变修饰符时相互的可赋值性。
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|c|c|c|c|c|c|c|} \hline
+        从右到下             & \lstinline!T! & \lstinline!mut T! & \lstinline!ref T! & \lstinline!mut ref T! & \lstinline!ref mut T!  & \lstinline!mut ref mut T!  \\\hline
+        \lstinline!T!       & 错误 & 错误 & 错误 & 错误 & 错误 & 错误 \\\hline
+        \lstinline!mut T!   & OK & OK & OK & OK & OK & OK \\\hline
+        \lstinline!ref T!   & 错误 & 错误 & 错误 & 错误 & 错误 & 错误 \\\hline
+        \lstinline!mut ref T!  & 错误 & 错误 & OK & OK & OK & OK \\\hline
+        \lstinline!ref mut T!  & OK & OK & 错误 & 错误 & 错误 & 错误 \\\hline
+        \lstinline!mut ref mut T! & OK & OK & OK & OK & OK & OK \\\hline
+    \end{tabular}
+    \caption{引用类型赋值}
+    \label{tab:reference-constness}
+\end{table}
+
+如果要简单概括这张表的信息，那就是一切都以不可变为准：如果在类型某个位置不可变，则相应位置就不能被修改；如果引用的变量可变，则它可以转换为引用不可变的（如 \lstinline!mut ref mut T! 到 \lstinline!mut ref T! 的转换）\footnote{这里并不会印象所引用变量的可变性，而只是从这个引用来看，它不能修改所引用变量的内容。}。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto i = 42;
+    auto mi = mut 42;
+    auto mri = mut ref i;
+    auto mrmi = mut ref mi;
+
+    mri <- mrmi;            // 没问题，mri 现在引用了 y，但不能修改 y
+    mrmi <- mri;            // 编译错误
+};
+\end{lstlisting}
+
+引用的重要性在于，它是唯一通过修改函数参数影响外部状态的方式。
+
+\begin{lstlisting}
+const swap = func (x : ref mut Int, y : ref mut Int) -> do {
+    auto tmp = deref(x);
+    x <- deref(y);
+    y <- tmp;
+};
+\end{lstlisting}
+
+上面用到的函数关键字 \lstinline!deref! 用来将引用转化为值。需要注意的是，\lstinline!deref! 不一定能运算成功，这是因为引用可能赋值为 \lstinline!default!，此时也就是所谓的\textbf{空引用（Null Reference）}。对于空引用，\lstinline!deref! 函数会导致运行错误。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto null : ref Int = default;
+    print deref(null);          // 运行错误，尝试解引用一个空引用
+};
+\end{lstlisting}
+
+引用类型的大小固定为 \lstinline!8!。
+
+
+\subsection{函数}
+
+\textbf{函数（Function）}我们至此已经有不少的使用经历了，但一直没有介绍过它的类型。简单来说，函数是所有通过箭头运算符 \lstinline!->! 构建的表达式模版。箭头的左侧是一个\textbf{参数列表（Parameter List）}，其表现为零到多个变量声明，而右侧是一个表达式，它可以使用左侧声明的变量。不过，为了编译器的方便，避免语法分析的歧义，AutoScript 要求函数在表达式中出现时必须使用阐述关键字 \lstinline!func! 来提示它是一个函数。
+
+\begin{lstlisting}
+const add = func (x : Int, y : Int) -> x + y;
+const partial_add = func (x : Int) -> func (y : Int) -> x + y;
+\end{lstlisting}
+
+上面两种函数的类型分别是 \lstinline!(Int, Int) -> Int! 和 \lstinline!Int -> Int -> Int!。在第一章中我们提到过，前面这种是狭义上的函数，而后面这种称为运算符。实际上，如果我们在构建函数时不断增加 \lstinline!->! 运算符，可以理论上构建出任意长的函数链；但习惯上我们几乎只会定义上面这两种，即 \lstinline!* -> *! 或 \lstinline!* -> * -> *! 这种\emph{类别}的函数。从构造来看，\lstinline!->! 应该是一个右结合的运算符，因此 \lstinline!Int -> Int -> Int! 应该理解为 \lstinline!Int -> (Int -> Int)!，即返回一个函数的函数。下面展示两者使用的差异：
+
+\begin{lstlisting}
+const add = func (x : Int, y : Int) -> x + y;
+const partial_add = func (x : Int) -> func (y : Int) -> x + y;
+
+const main = func () -> do {
+    auto sum_1 = add(1, 2);
+    auto add1 = partial_add(1);
+    auto sum_2 = add1(2);
+};
+\end{lstlisting}
+
+可以看到，\texttt{partial\_add} 可以先接入一个参数，并返回一个函数（正如它的定义暗示的），然后我们可以为这个函数再输入一个参数，并返回结果。运算符这样的性质让它们可以轻易地复用自己的定义，这在一些函数中变量初始化需要较大开销的场景中颇为有用。
+
+\begin{lstlisting}
+const random_int = func (type : EngineType) -> do {
+    initiate_engine : EngineType -> Engine;
+    static engine = initiate_engine(type);
+    return func (...args) -> engine(...args);
+};
+\end{lstlisting}
+
+上面的例子中用到了范型参数包 \lstinline!...args!，可以先简单理解为可以接受零到多个不定的参数，并传递给 \lstinline!engine! \footnote{我们会在后面介绍模式匹配时详细介绍这个语法。}。 \\
+
+函数区别与此前介绍的各种复合类型在于，它没有确定的内存布局。事实上在许多语言中，函数和其它类型是区别对待的。AutoScript 消除了对函数的特殊照顾，并让它拥有确切的类型，并可以绑定为一个变量。如果从实现来看，函数的本质是一个内存地址，因此其大小和引用类型相同，固定为 \lstinline!8!。

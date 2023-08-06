@@ -1,0 +1,577 @@
+\begin{introduction}
+    \item 简单语句
+    \item 语句块
+    \item \lstinline!break! 语句
+    \item \lstinline!continue! 语句
+    \item 声明语句
+    \item 模式声明
+    \item \lstinline!else! 子句
+    \item \lstinline!then! 子句
+    \item \lstinline!return! 语句
+    \item \lstinline!throw! 语句
+    \item \lstinline!assert! 语句
+    \item \lstinline!assume! 语句
+    \item \lstinline!try! 语句
+\end{introduction}
+
+\section{语句}
+
+\textbf{语句（Statement）}代表了 AutoScript 中的一个单独操作 \footnote{注意区分单独操作和\emph{原子操作}：单独操作是指在语义上是一个操作，而原子操作是指其可以被转译为一个单独的汇编指令。}。语句之间大多通过 \lstinline!;! 进行分隔，少部分（以块结构结尾的）语句不需要加分号。
+
+\subsection{简单语句}
+
+简单语句顾名思义是结构非常简单的语句，它包括两种情况。
+
+\begin{grammar}[简单语句] \label{grm:simple-statement}
+\begin{enumerate}
+	\item \lstinline!;!
+	\item \lstinline![expr];!
+\end{enumerate}
+\end{grammar}
+
+可以看到，简单语句包含了空语句和求值语句，前者不做任何事，后者会对表达式进行求值（除非它是一个 \lstinline!lazy! 表达式，此时也不会做任何事）。
+
+\subsection{块语句和跳转语句}
+
+\textbf{块语句（Block Statement）}，也被称为\textbf{语句块（Block）} 是由一对大括号组成的结构，其中包含了零到多个语句。语句块定义了一个\emph{作用域}。回忆第二章中我们曾经介绍过，不同作用域中允许声明相同名字的变量。我们可以用 \lstinline!@name! 属性为作用域命名，它会出现在语句块中变量的名字中。
+
+\begin{lstlisting}
+const main = func () -> do @name(body) {
+    @name(inner) {
+        auto x = 42;
+        print nameof(x);		// 输出 ::main::body::inner::x
+    }
+};
+\end{lstlisting}
+
+我们可以用 \lstinline!break! 语句来跳出某个语句块。
+
+\begin{grammar}[\texttt{break} 语句 \texttt{[break-stmt]}] \label{grm:break-statement}
+\begin{enumerate}
+	\item \lstinline!break! \texttt{[scope-id]} \lstinline!;!
+	\item \lstinline!break;!
+\end{enumerate}
+\end{grammar}
+
+第一种情况跳出给定的作用域，而第二种默认跳出当前作用域。
+
+\begin{lstlisting}
+const main = func () -> do {
+    @name(outer) {
+        scan x : Int;
+        if (x > 0) {
+            break outer;
+        }
+    }
+};
+\end{lstlisting}
+
+只有局部作用域中允许使用 \lstinline!break! 语句。要注意，\lstinline!do! 和 \lstinline!monad! 表达式后的语句块不能通过 \lstinline!break! 语句跳出。 \\
+
+特别地，我们可以用 \lstinline!last! 表示上一个作用域。这里的 \lstinline!last! 是一个上下文关键字，它只在特定语句中有作用。
+
+此外，可以使用 \lstinline!continue! 语句跳回作用域的开始。
+
+\begin{grammar}[\texttt{continue} 语句 \texttt{[continue-stmt]}] \label{grm:continue-statement}
+\begin{enumerate}
+	\item \lstinline!continue! \texttt{[scope-id]} \lstinline!;!
+	\item \lstinline!continue;!
+\end{enumerate}
+\end{grammar}
+
+第一种情况跳到给定的作用域开始，而第二种默认跳到最内层的作用域开始。
+
+\begin{lstlisting}
+const main = func () -> do @name(body) {
+    scan x : Int;
+    @name(inner) {
+        scan y : Int;
+        if (x * y > 0) {
+            continue inner;
+        }
+        if (x * y < 0) {
+            continue body;
+        }
+    }
+};
+\end{lstlisting}
+
+可以看到，\lstinline!continue! 语句允许用在 \lstinline!do! 表达式的语句块上。 \\
+
+最后值得一提的是，块语句中的最后一个语句允许不添加分号；这和表达式中在最后可以添加逗号同理。
+
+\begin{lstlisting}
+const main = func () -> do { return 42 };	// 这里没有在 return 语句中使用分号。
+\end{lstlisting}
+
+\subsection{声明语句}
+
+本节让我们给出声明语句的完整语法。
+
+\begin{grammar}[声明语句] \label{grm:declaration-statement}
+\begin{enumerate}
+    \item \lstinline![storage-spec] [id] :! \texttt{[type-spec]} \lstinline!;!
+    \item \texttt{[pattern]} \lstinline!=! \texttt{[expr]} \lstinline!;!
+\end{enumerate}
+\end{grammar}
+
+可以将上面的语法和语法 \ref{grm:variable-declaration-basics} 比较。第一种情况是一个\emph{提前声明}，提示编译器某个名字拥有的类型。第二种情况下，变量声明包含一个\textbf{模式（Pattern）}和初始化表达式。这里，\lstinline![pattern]! 是一个\textbf{模式声明（Pattern Declaration）}，其中包含了一个特定结构，且可能会引入一些名字（在声明语句中，总会引入一个名字）。\lstinline![expr]! 是一个表达式，它的值这里被称为待匹配实体。有关模式声明，请参考下面的一些例子：
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto tup = (1, 2);
+    auto (m, n) = tup;      // 这里使用元组模式声明 (m, n)
+    print m;                // 输出 1
+    print n;                // 输出 2
+};
+\end{lstlisting}
+
+我们可以在模式声明中再次使用模式声明，这也就是模式的嵌套：
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto tup = (1, 2);
+    auto (m : mut, n) = tup;// 这里的 m : mut 是一个原子模式，它嵌在元组模式 (m : mut, n) 中
+    print typeof(m);        // 输出 mut Int
+    print typeof(n);        // 输出 Int
+};
+\end{lstlisting}
+
+注意到 \lstinline!m : mut! 中并没有将 \lstinline!m! 的类型完全写出来，这是因为我们可以通过 \lstinline!tup! 来推断它的类型（并在最外层加上 \lstinline!mut! 修饰）。如果要得到某个实体的引用，则可以通过下面的方式：
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto tup = mut (1, 2);
+    auto (ref m, n) = ref tup;  // 这里的 ref m 是一个引用模式声明
+    print typeof(m);            // 输出 Int
+    print typeof(n);            // 输出 ref Int
+};
+\end{lstlisting}
+
+这里我们看到，元组的引用类型可以被匹配为元组模式，其中的每个元素类型都是原来元组中元素的引用类型。 \\
+
+这里有必要说明出现在 模式声明中的 \lstinline!ref! 和作为类型限定符的 \lstinline!mut! 的区别。模式声明会匹配对象进行强匹配：被匹配的值需要完全满足模式声明中的结构，但类型限定符允许初始化值被隐式类型转换为声明的类型。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x = 42;
+    auto y = mut 42;
+    auto mut z = x;         // 编译错误，mut y 无法匹配 x，后者不是可变类型
+    auto mut z = y;         // 没问题
+    print typeof(z);        // 输出 Int，因为 mut y 作为模式声明整体才是 mut Int
+};
+\end{lstlisting}
+
+若非必要，并不推荐将 \lstinline!ref! 以外的修饰符用于模式声明中，因为它会造成迷惑 \footnote{确实，明明声明为 \lstinline!mut x!，但 \lstinline!x! 本身一定不是可变类型。初见时可能非常反直觉，但对 AutoScript 中的模式熟悉之后，这会变得自然。}。此后我们会更深入地介绍 AutoScript 的模式系统。
+
+\subsection{条件语句}
+
+我们在第一章中已经介绍过 \lstinline!if! 语句的用法。不过，光有 \lstinline!if! 语句本身似乎表达力不够充足：我们已经判断过的表达式，此后应该不需要再反过来判断一遍才对。此时可以使用 \lstinline!else! \emph{子句}。
+
+\begin{grammar}[\texttt{else} 子句]
+    \lstinline![stmt] else [block]!
+\end{grammar}
+
+\lstinline!else! 子句和 \lstinline!if! 语句一起使用时，当且仅当 \lstinline!if! 语句的表达式判断为假时会执行 \lstinline!else! 后的语句块。
+
+\begin{lstlisting}
+const main = func () -> do {
+    scan x : Int;
+    if (x < 0) {
+        print "Negative";
+    }
+    else {                      // 以 x < 0 为假为前提
+        print "Non negative";
+    }
+};
+\end{lstlisting}
+
+特别地，\lstinline!else! 子句中不仅可以放一个语句块，也可以放一个 \lstinline!if! 语句，因此我们可以连续写多个互斥的 \lstinline!if! 语句来筛选情况。
+
+\begin{lstlisting}
+const main = func () -> do {
+    scan x : Int;
+    if (x < 0) {
+        print "Too small";
+    }
+    else if (x < 20) {
+        print "A bit small";
+    }
+    else if (x < 80) {
+        print "Good";
+        return;
+    }
+    else if (x < 100) {
+        print "A bit large";
+    }
+    else {
+        print "Too large";
+    }
+    continue;
+};
+\end{lstlisting}
+
+\subsection{循环语句}
+
+从本章新介绍的 \lstinline!continue! 出发，我们可以实现一个最原始的循环语句：
+
+\begin{lstlisting}
+const main = func () -> do {
+    {
+        // 做一些事情
+        continue;
+    }
+};
+\end{lstlisting}
+
+实际上，\lstinline!while! 语句可以看作是上面这种写法的语法糖：
+
+\begin{lstlisting}
+const main = func () -> do {
+    scan b : Bool;
+    while (b) {
+        // 做一些事情
+    }
+
+    // 上面的代码和下面的等价
+    {
+        // 做一些事情
+        continue if (b);
+    }
+};
+\end{lstlisting}
+
+显然 \lstinline!while! 语句有更好的可读性。以上面的等价代码为启示，我们也可以猜到 \lstinline!break! 和 \lstinline!continue! 语句在 \lstinline!while! 代码块中的作用。值得特别一提的是 \lstinline!else! 子句在 \lstinline!while! 语句中的作用。如果 \lstinline!while! 语句由于没有满足表达式条件退出，则会进入后面的 \lstinline!else! 子句。
+
+\begin{lstlisting}
+const main = func () -> do {
+    scan x : Int;
+    while (x > 0) {
+        print "Good";
+        if (x == 42) {
+            print "Pretty good";
+            break;
+        }
+        print "Try again";
+        scan x;
+    }
+    else {
+        print "Bad";
+    }
+};
+\end{lstlisting}
+
+上面的程序中，如果某次输入了负数，则会输出 \lstinline!Bad! 然后程序结束。否则则会反复要求输入整数，直到输入 \lstinline!42! 后通过 \lstinline!break! 语句退出循环。注意通过 \lstinline!break! 语句退出时不会进入 \lstinline!else! 子句。 \\
+
+如果想要让 \lstinline!break! 出来的控制流进行特殊操作，可以使用 \lstinline!then! 子句。
+
+\begin{grammar}[\texttt{then} 子句]
+    \lstinline![stmt] then [block]!
+\end{grammar}
+
+\lstinline!then! 子句和 \lstinline!else! 子句可以一起使用。在同一个语句中，它们的顺序并不重要，但只能出现一次。注意，虽然可以在这两个子句中使用 \lstinline!break! 语句，但它并不能通过再添加一个 \lstinline!then! 语句来接管控制流。
+
+\begin{lstlisting}
+const main = func () -> do {
+    scan x : Int;
+    while (x >= 0) {
+        if (x == 0) {
+            print "Zero";
+            break;
+        }
+        if (x == 42) {
+            print "Secret";
+            break;
+        }
+        scan x;
+    }
+    then {
+        print "You've passed!";
+    }
+    else {
+        print "You've failed";
+    }
+};
+\end{lstlisting}
+
+\subsection{遍历语句}
+
+AutoScript 中的遍历语句 \lstinline!for! 和其它语言（如 C++）的含义有一定差别。它的本质和循环语句不同。
+
+\begin{lstlisting}
+const main = func () -> do {
+    for (i from range(0, 10)) {			// 这里 i 的类型是 Int
+        print i;                        // 从 0 输出到 9
+    }
+    auto maybe_int = Some 42;			// maybe_int 的类型是 Option[Int]
+    for (i from maybe_int) {
+        print i;                        // 输出 42
+    }
+};
+\end{lstlisting}
+
+上面用到了 \lstinline!Prelude! 中定义的 \lstinline!range! 函数，其返回一个左闭右开的区间。\lstinline!Just 42! 构建了一个 \lstinline!Option! 类型。可以看到，\lstinline!for! 语句可以将一些类型中的元素取出，这些类型并不限定是一个\emph{范围}。 \\
+
+\lstinline!for! 语句中也可以使用 \lstinline!else! 和 \lstinline!then! 子句。当 \lstinline!for! 遍历的对象为空时（或遍历到最后），会进入 \lstinline!else! 子句。否则（通过 \lstinline!break! 语句跳出时）进入 \lstinline!then! 子句。
+
+\begin{lstlisting}
+const main = func () -> do {
+	scan arr : Array(Int, 3);
+	print "( ";
+    for (e from arr) {
+        print e;
+    }
+    then {
+    	print ")";
+    }
+    else {
+        print "The array is empty";
+    }
+};
+\end{lstlisting}
+
+\subsection{返回语句}
+
+AutoScript 中，返回语句用来跳出 \lstinline!do! 或 \lstinline!monad! 表达式（相当于 \lstinline!break! 语句之于普通的语句块，不过返回语句需要返回一个值）。
+
+\begin{grammar}[\texttt{return} 语句] \label{grm:return-statement}
+    (1)\ \lstinline!return [expr];! \\
+    (2)\ \lstinline!return;!
+\end{grammar}
+
+\lstinline!return! 语句将一个表达式的值作为返回值。如果没有给出这个表达式，则返回空对象 \lstinline!()!。我们已经使用它很多次了。在 \lstinline!do! 表达式的末尾会默认插入一个 \lstinline!return! 语句。
+
+\begin{lstlisting}
+const foo = func () -> do {
+	scan x : Int;
+	if (x == 42) {
+		return 0;
+	}
+	// 这里会默认插入 `return;`，但这和此前推导的 do 表达式类型不同，因此会产生编译错误。
+};
+\end{lstlisting}
+
+\begin{grammar}[\texttt{throw} 语句] \label{grm:throw-statement}
+    (1)\ \lstinline!throw [expr];! \\
+    (2)\ \lstinline!throw;!
+\end{grammar}
+
+\lstinline!throw! 语句将构成返回表达式的异常类型。如果当前控制流捕获了一个异常（通过 \lstinline!catch! 子句，我们很快就会介绍），则可以由 \lstinline!throw;! 再次抛出这个异常 \footnote{这里的语法设计是为了贴合 C++ 中的惯用。从其它两种返回语句的语法类推，这里 \lstinline!throw! 应该指 \lstinline!throw ();! 才对，但实际并非如此。}。
+
+\begin{grammar}[\texttt{yield} 语句] \label{grm:yield-statement}
+    (1)\ \lstinline!yield [expr];! \\
+    (2)\ \lstinline!yield;!
+\end{grammar}
+
+\lstinline!yield! 语句用在\emph{协程}中，其暂停当前的协程并返回一个值。	
+
+\begin{lstlisting}
+const ints = func () -> do {
+	auto i = mut 0;
+	yield i;
+	i <- i + 1;
+	continue;
+};
+
+const main = func () -> do {
+	for (i from ints()) {
+		print i;					// 无限地打印从自然数（0, 1, 2, ...）。
+	}
+};
+\end{lstlisting}
+
+我们会在并发章节中详细介绍 \lstinline!yield! 语句。
+
+\subsection{输入输出语句}
+
+AutoScript 利用 \lstinline!print! 语句进行输出，我们已经多次使用了。
+
+\begin{grammar}[\texttt{print} 语句] \label{grm:print-statement}
+    \lstinline!print [expr];!
+\end{grammar}
+
+默认情况下，\lstinline!print! 会打印在命令行上。如果想要手动选择输出的目标，可以使用属性 \lstinline!@stream! 属性，其中可以放入一个已经打开的文件流。对于 \lstinline!print! 语句，会让其内容在给定的文件流中输出。
+
+\begin{lstlisting}
+import System;
+
+const main = func () -> do {
+    auto file = System.open("output.txt", "w");
+    @stream(file)
+    print "Hello, world!";
+};
+\end{lstlisting}
+
+此外，也可以用 \lstinline!@endwith! 来指定 \lstinline!print! 结尾的字符（默认为 \lstinline!\n!）。 \\
+
+\lstinline!scan! 语句则用来输入。
+
+\begin{grammar}[\texttt{scan} 语句] \label{grm:scan-statement}
+    (1)\ \lstinline!scan [expr];! \\
+    (2)\ \lstinline!scan [decl-stmt]!
+\end{grammar}
+
+和 \lstinline!print! 语句类似地，我们可以通过 \lstinline!@stream! 属性来指定一个输入流。
+
+\begin{lstlisting}
+import System;
+
+const main = func () -> do {
+    auto file = System.open("input.txt", "r");
+    @stream(file)
+    scan text : String;
+};
+\end{lstlisting}
+
+\subsection{优化提示语句}
+
+AutoScript 提供了一系列语句来为编译器进行优化提示。其中最常见的是用于断言的 \lstinline!assert! 语句。
+
+\begin{grammar}[\texttt{assert} 语句] \label{grm:assert-statement}
+    \lstinline!assert [expr];! 
+\end{grammar}
+
+若 \lstinline!assert! 后的表达式在编译期判断为假，则编译器可以中止编译并输出断言错误。如果这个表达式无法编译期求值，则会生成一段代码，在运行期判断为假时抛出断言异常。
+
+\begin{lstlisting}
+const main = func () -> do {
+    assert 1 == 0;          // 编译错误，断言失败
+    scan x : Int;
+    assert x == 42;         // 编译期无法判断
+
+    // 编译器会生成下面的代码
+    if (not (x == 42)) {
+        throw AssertionError("Expected x == 42");
+    }
+};
+\end{lstlisting}
+
+可以使用 \lstinline!@alert! 属性让 \lstinline!assert! 失败时调用自定义的函数来输出错误信息。这常用于编译器的 Debug 提示。
+
+\begin{lstlisting}
+const message = func () -> print "Use common sense!";
+
+const main = func () -> do {
+    @alert(message)
+    assert 1 == 0;
+};
+\end{lstlisting}
+
+注意 \lstinline!@alert! 中传入的函数必须不接入任何参数。 \\
+
+比 \lstinline!assert! 语句“温和”一些的是 \lstinline!assume! 语句。
+
+\begin{grammar}[\texttt{assume} 语句] \label{grm:assume-statement}
+    \lstinline!assume [expr];!
+\end{grammar}
+
+编译期会将表达式 \lstinline![expr]! 当作优化提示。如果实际情况并非如此可能会出现未定义行为。
+
+\begin{lstlisting}
+const main = func () -> do {
+    scan x : Int;
+    assume x > 0;
+    if (x == 0) {
+        print "Impossible...?";
+    }
+};
+\end{lstlisting}
+
+上面的例子中，编译期通过 \lstinline!assume! 的表达式知晓了 \lstinline!x! 理应大于零，因此在分支预测时会默认跳过。如果在运行期我们输入了一个非正数，那么就是一个未定义行为。 \\
+
+一些编译期可能无法通过的语句可以用预演语句 \lstinline!try! 来尝试。
+
+\begin{grammar}[\texttt{try} 语句] \label{grm:try-statement}
+    \lstinline!try [stmt]!
+\end{grammar}
+
+如果编译期就发现这个语句不可能执行，则编译器会将其消除。如果无法编译期判断（比如使用了动态类型），则会在运行期检查并选择性跳过。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x = 42;
+    try x <- 20;            // 预演失败，因为 Int 不是可变类型
+    auto y = dyn 42;
+    try y.val <- 24;		// 运行时预演失败，因为 y 没有 data 这个动态成员
+};
+\end{lstlisting}
+
+可以使用 \lstinline!@alert! 属性让 \lstinline!try! 语句预演失败时调用一个函数。
+
+\begin{lstlisting}
+const message = func () -> print "Check mutability!";
+
+const main = func () -> do {
+    auto x = 42;
+    @alert(message)
+    try x <- 20;
+};
+\end{lstlisting}
+
+最后还有用于类型约束缓存的 \lstinline!implement! 语句，让我们在模版的章节中再详细介绍。
+
+\section{子句}
+
+此前我们已经见过 \lstinline!if!、\lstinline!else!、\lstinline!then! 等子句了。本节中让我们介绍一些其它常用的子句。
+
+\subsection{where 子句}
+
+在任何语句中都可以使用 \lstinline!where! 子句。
+
+\begin{grammar}[\texttt{where} 子句] \label{grm:where-clause}
+    \lstinline!where [block]!
+\end{grammar}
+
+在 \lstinline!where! 子句中的语句块中定义的任何变量都会引入到当前语句中。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto fib_10 = fib(10) where {
+        auto fib : Int -> Int;
+        auto fib = func (x : Int) -> do {
+            if (x <= 1) {
+                return x;
+            }
+            return fib(x-1) + fib(x-2);
+        };
+    };
+};
+\end{lstlisting}
+
+同一个语句中只允许出现一个 \lstinline!where! 子句。
+
+\subsection{with 子句}
+
+可以通过 \lstinline!with! 子句将一些自动存储期的变量引入到内部作用域，从而提前释放这个变量。
+
+\begin{grammar}[\texttt{with} 子句] \label{grm:with-clause}
+    \lstinline!with [id-tuple]!
+\end{grammar}
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x = 42;
+    auto str = "abc";
+    {
+        auto x = 24;    // 错误，因为 x 被引入了当前作用域
+    } with (x, str);
+};
+\end{lstlisting}
+
+\subsection{requires 子句}
+
+在声明语句中都可以使用 \lstinline!requires! 子句，它要求当前声明的对象拥有特定的性质，否则产生编译错误。
+
+\begin{grammar}[\texttt{requires} 子句] \label{grm:requires-clause}
+	\lstinline!requires [expr]!
+\end{grammar}
+
+\begin{lstlisting}
+const main = func () -> do {
+	auto x = 42 requires True;				// 没问题
+	auto y = 24 requires sizeof(y) == 0;	// 编译错误
+};
+\end{lstlisting}
+
+
+

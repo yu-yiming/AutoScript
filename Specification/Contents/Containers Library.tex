@@ -1,0 +1,158 @@
+\begin{introduction}
+	\item 
+\end{introduction}
+
+\section{Containers 库概览}
+
+\lstinline!Containers! 库中定义了常用的几种数据结构，如 \lstinline!Containers.ArrayList!、\lstinline!Containers.HashTable! 和 \lstinline!Containers.Map! 等。下面让我们用数据结构的形式来分类介绍。
+
+
+\subsection{线性存储类型}
+
+包括一些抽象上是线性存储的容器，它们的特点是内存开销相对较小，但是排序性比较差。
+
+\subsubsection{Containers.List}
+
+\lstinline!List! 是一个动态长度的类似于 \lstinline!Array! 的类型 \footnote{熟悉其它语言的读者可以联系 C++ 中的 \lstinline!vector! 与 Java 中的 \lstinline!ArrayList!。}。它的内部实现中会分配比实际元素个数更多的内存，这样可以在插入元素时有更多的空间，直到不够时再重分配内存。
+
+\begin{lstlisting}
+export const List = struct (
+	private data : ref infer T,
+	@prop(get, undefined) size : Int,
+	@prop(get, undefined) capacity : Int
+);
+\end{lstlisting}
+
+\lstinline!Vector! 可以通过 \lstinline!make_list! 函数来构建。
+
+\begin{lstlisting}
+export const make_list = func (
+	size : Int,
+	capacity : Int
+	value : infer T
+) -> do {
+	auto list_size = size ?? 0;
+	auto list_cap = capacity ?? size ?? 8;
+	assert list_size < list_cap;
+	assert typeof(T) != Unresolved;
+	auto list_data = malloc(sizeof(Int) * capacity) as ref mut T;
+	if (value != missing) {
+		for (elem from list_data) {
+			list_data <- value;
+		}
+	}
+	return (list_size, list_cap, list_data) as List;
+};
+\end{lstlisting}
+
+使用示例如下：
+
+\begin{lstlisting}
+const main = func () -> do {
+	auto v1 = make_list(3, 10, 42);				// 构建了内存长度为 10，拥有三个 42 的 List
+	auto v2 = make_list[size = 3, value = 42];	// 构建了拥有三个 42 的 List
+};
+\end{lstlisting}
+
+下面是一些和 \lstinline!List! 相关的函数：
+
+\begin{enumerate}
+	\item \lstinline!at!：访问特定位置的元素，会首先进行边界检查。
+	\begin{itemize}
+		\item 参数：
+		\begin{enumerate}
+			\item \lstinline!this : ref mut? List(infer T)!：目标列表。
+			\item \lstinline!i : Int!：用整数表示的一个位置。
+		\end{enumerate}
+		\item 返回类型：\lstinline!ref mut?!。
+		\item 异常类型：\lstinline!BoundaryError!：访问下标不合法时抛出。
+	\end{itemize}
+	
+	\item \lstinline!push!：向列表结尾插入一个元素。
+	\begin{itemize}
+		\item 参数：
+		\begin{enumerate}
+			\item \lstinline!this : ref mut List(infer T)!：目标列表。
+			\item \lstinline!e : ref? T!：按值或引用传递的一个元素。
+		\end{enumerate}
+		\item 返回类型：\lstinline!Iterator(List(T))!，列表最后一个元素的迭代器。
+		\item 异常类型：\lstinline!()!。
+	\end{itemize}
+	
+	\item \lstinline!pop!：从列表结尾移除一个元素。
+	\begin{itemize}
+		\item 参数：
+		\begin{enumerate}
+			\item \lstinline!this : ref mut List(infer T)!：目标列表。
+		\end{enumerate}
+		\item 返回类型：\lstinline!T!：移除的元素。
+		\item 异常类型：\lstinline!EmptyError!，目标列表长度为零时抛出。
+	\end{itemize}
+	
+	\item \lstinline!insert!：在列表中指定位置处插入一个元素。
+	\begin{itemize}
+		\item 参数：
+		\begin{enumerate}
+			\item \lstinline!this : ref mut List(infer T)!：目标列表。
+			\item \lstinline!pos : Iterator(List(T))!：指定的位置。
+			\item \lstinline!e : ref? T!：按值或引用传递的一个元素。
+		\end{enumerate}
+		\item 返回类型：\lstinline!Iterator(List(T))!，插入位置的迭代器。
+		\item 异常类型：\lstinline!BoundaryError!，传入迭代器不在列表中时抛出。
+	\end{itemize}
+	
+	\item \lstinline!remove!：在列表中指定位置处移除一个元素。
+	\begin{itemize}
+		\item 参数：
+		\begin{enumerate}
+			\item \lstinline!this : ref mut List(infer T)!：目标列表。
+			\item \lstinline!pos : Iterator(List(T))!：指定的位置。
+		\end{enumerate}
+		\item 返回类型：\lstinline!T!，移除的元素。
+		\item 异常类型：\lstinline!EmptyError!，目标列表长度为零时抛出。
+	\end{itemize}
+	
+	\item \lstinline!reserve!：让列表保证给定的容量。
+	\begin{itemize}
+		\item 参数：
+		\begin{enumerate}
+			\item \lstinline!this : ref mut List(infer T)!：目标列表。
+			\item \lstinline!cap : Int!：指定的容量大小。
+		\end{enumerate}
+		\item 返回类型：\lstinline!Int!，当前容量的大小。
+		\item 异常类型：\lstinline!()!。
+	\end{itemize}
+	
+	\item \lstinline!clear!：清除列表中所有元素。
+	\begin{itemize}
+		\item 参数：
+		\begin{enumerate}
+			\item \lstinline!this : ref mut List(infer T)!：目标列表。
+		\end{enumerate}
+		\item 返回类型：\lstinline!()!。
+		\item 异常类型：\lstinline!()!。
+	\end{itemize}
+	
+	\item \lstinline!resize!：修改列表大小为指定大小；如果小于当前元素个数则会截去所有多余的元素，大于当前元素个数则会用给定的值初始化新的元素。
+	\begin{itemize}
+		\item 参数：
+		\begin{enumerate}
+			\item \lstinline!this : ref mut List(infer T)!：目标列表。
+			\item \lstinline!n : Int!：修改后列表的元素个数。
+			\item \lstinline!e : ref? T!：新的元素的统一值，以值或引用传递。
+		\end{enumerate}
+		\item 返回类型：\lstinline!()!。
+		\item 异常类型：\lstinline!()!。
+	\end{itemize}
+	
+	\item \lstinline!shrink!：修改列表容量为当前元素个数，可能会发生内存重分配。
+	\begin{itemize}
+		\item 参数：
+		\begin{enumerate}
+			\item \lstinline!this : ref mut List(infer T)!：目标列表。
+		\end{enumerate}
+		\item 返回类型：\lstinline!()!。
+		\item 异常类型：\lstinline!()!。
+	\end{itemize}
+	
+\end{enumerate}

@@ -1,0 +1,265 @@
+\begin{introduction}
+	\item 模块
+	\item \lstinline!import! 语句
+	\item 访问修饰符
+\end{introduction}
+
+本节让我们讨论 AutoScript 中的模块机制，并细致地讲解\emph{名字空间}的概念。它们决定了程序的构成、名字的可见性与可访问性。
+
+\section{名字空间}
+
+\subsection{修饰名字}
+
+所有合法的 AutoScript 名字都能表示成以域连接符 \lstinline!::! 开头，由域连接符分隔的多个不以数字和符号（\texttt{\$} 除外）开头的非空字符串组成的，类似这样的名字称为\emph{全修饰名字}，其中任一段以 \lstinline!::! 分隔的部分都称为\emph{分段名字}，全修饰名字中去掉最后的一或多个分段名字的部分被称为名字的\emph{修饰前缀}。 \\
+
+举例来说，\texttt{::foo123::bar} 和 \texttt{::\_123\_} 都是合法的全修饰名字，但 \texttt{::1abc} 和 \texttt{::a;b} 不是；\texttt{abc} 和 \texttt{a\_123} 都是分段名字，而 \texttt{a::b} 不是；\texttt{::abc} 是 \texttt{::abc::def} 的修饰前缀。 \\
+
+在所有全修饰名字中，有一些被保留作为编译器使用的名字，它们是以 \texttt{\$} 作为任何分段名字的开头的名字，如 \texttt{::abc::\$a}，以及在任何地方包含连续两个下划线的名字，如 \texttt{::abc::a\_\_b}。编译器不会对这些名字进行报错，但非常不建议使用这些名字，很有可能会让编译过程出现意想不到的问题。 \\
+
+我们很少会使用全修饰名字，因为它冗长且不必要。参考下面的例子：
+
+\begin{lstlisting}
+const add = func (x : Int, y : Int) -> x + y;
+
+const main = func () -> do {
+	print ::add(1, 2);		// 使用了全修饰名字 ::add
+};
+\end{lstlisting}
+
+这里，全修饰名字 \lstinline!::add! 等同于我们在上面定义的 \lstinline!add!。需要注意，虽然使用时可以使用全修饰名字，但是变量声明处不允许全修饰。 \\
+
+除了全修饰以外，我们也可以使用部分修饰名字。部分修饰名字可以用在变量声明处 \footnote{注意，这绝非提倡的写法；实际上，由于编译器也会像 \texttt{\$} 和 \texttt{\_\_} 一样自动生成含有 \texttt{::} 的名字，擅自定义一个部分修饰名字是有很大风险的；不过和前两者不同的是，有关 \texttt{::} 的生成规则有迹可循，编译器会严格按照作用域的结构生成（我们后面会提到），因此有办法避免和编译器冲突。}。
+
+\begin{lstlisting}
+const good::add = func (x : Int, y : Int) -> x + y;
+
+const main = func () -> do {
+	print ::good::add(1, 2);	// 使用了全修饰名字 ::good::add
+};
+\end{lstlisting}
+
+从这一角度来看，甚至可以将 \texttt{::} 看作是名字中合法的字符序列，可惜事非如此：比如 \texttt{::::} 并不是一个合法的名字；更重要的是，由 \texttt{::} 定义出的分段名字和修饰前缀有它们的特殊含义。
+
+\subsection{名字空间和作用域}
+
+AutoScript 中，\textbf{名字空间（Namespace）}是全修饰名字的一个前缀。比如 \texttt{::abc::def::ghi} 中，\texttt{::abc} 和 \texttt{::abc::def} 都是一个名字空间，而 \texttt{::abc::def::ghi} 不是。特别地，最顶层的名字空间称为\emph{全局空间}，所有在文件中直接定义的名字 \footnote{也就是不在任何函数、结构等内部定义的非修饰名字} 都属于这个空间。
+
+\begin{lstlisting}
+static Value = 42;				// 全局空间中的一个静态存储期变量
+const Point = struct (			// Point 是全局空间的一个变量
+	x : Real,					// x 和 y 并非在全局空间中，而是在名字空间 ::Point 中
+	y : Real					// 我们此前已经知道，它们实际上是 ::Point::x 和 ::Point::y
+);
+const main = func () -> ();		// 我们熟悉的 main 函数也是在全局空间中
+\end{lstlisting}
+
+名字空间通常是和作用域同时出现的，因此出现作用域的地方一定会出现新的名字空间。
+
+\begin{lstlisting}
+const main = func () -> do @name(body) {
+	auto x = 42;
+	@name(inner) {
+		auto y = 24;
+		print nameof(y);	// 输出 ::main::body::inner::y
+	}
+	print nameof(x)			// 输出 ::main::body::x
+};
+\end{lstlisting}
+
+这里，我们利用内置函数 \lstinline!nameof! 来得到一个名字的全修饰名字。可以看到，函数作用域、\lstinline!do! 表达式的作用域和内部作用域都为变量添加了分段名字。以 \lstinline!x! 为例，它全修饰名字中的 \lstinline!main!、\lstinline!body! 正好反应了其所在作用域从外到内的顺序。 \\
+
+当然，很多情况下，我们不会为作用域命名。此时编译器会对赋予这个作用域唯一的名字。
+
+\begin{lstlisting}
+const main = func () -> do {
+	auto x = 42;
+	print nameof(x);		// 可能输出 ::main::unnamed0::x;
+};
+\end{lstlisting}
+
+由于我们无法提前推测编译器的取名，因此我们无法访问未具名的作用域中的变量。
+
+\subsection{名字查找}
+
+我们已经知道所有的名字都有一个和作用域有关的全修饰名字，那么在使用未修饰或部分修饰名字时，编译器是如何知晓我们实际指向的名字的呢？这就是\textbf{名字查找（Name Lookup）}规则发挥作用的地方。当编译器看到任一个名字时，它都会按照以下步骤来查找：
+
+\begin{enumerate}
+	\item 如果这是一个全修饰名字，查找终止，这就是编译器想要的结果。
+	\item 如果这是一个部分修饰名字，则查找其第一个分段名字，随后将结果和后面的分段拼接得到最终结果。
+	\item 如果出现在点调用表达式中 \lstinline!.! 的右侧，则尝试从左侧表达式的\emph{解引用类型}的\emph{实例类型}的作用域中查找这个名字。
+	\item 从当前作用域中查找这个名字。
+	\item 从当前作用域所在的作用域（从内到外）查找这个名字。
+\end{enumerate}
+
+这实际上也解释了名字\emph{覆盖}产生的原因。下面是一系列例子：
+
+\begin{lstlisting}
+::x			// 寻找全局空间中的 x
+m::x		// 寻找 m 后在 m 空间中寻找 x
+f.x(a, b)	// 寻找 instof(derefof(f)) 空间中的 x
+\end{lstlisting}
+
+如果编译器找不到任何满足要求的名字，则会产生报错：名字未定义。 \\
+
+对于函数（无论其类别），AutoScript 有一个特别的名字查找规则：\textbf{参数依赖名字查找（Argument Dependent Lookup, ADL）}。编译器会首先尝试在两个参数所在的名字空间中寻找当前运算符的定义，随后再寻找当前作用域和其所在的作用域（从内岛外）。
+
+\begin{lstlisting}
+const main = func () -> do {
+	const WrappedInt = Int;
+	const + = func (x : WrappedInt) -> func (y : WrappedInt) -> (x as Int) + (y as Int);
+	@name(inner) {
+		const + = func (x : WrappedInt) -> func (y : WrappedInt) -> 42;
+		print (0 as WrappedInt) + (1 as WrappedInt);		// 输出 3
+	}
+};
+\end{lstlisting}
+
+从这个例子出发，我们可以得出“变量覆盖对函数不总成立”的结论。确实如此，不过这不是它的主要用处。下一节中我们会详细提到 ADL 的重要用处。
+
+\section{模块}
+
+\subsection{模块的声明}
+
+AutoScript 并没有为模块设计特殊的机制，它完全复用了对象表达式。我们可以通过构建具名的对象表达式来声明一个模块。
+
+\begin{lstlisting}
+const MyModule = object {};		// 一个空模块，名字是 MyModule
+\end{lstlisting}
+
+因此，和我们在 object 表达式章节中学到的一样，所有结构作用域中自动存储期的变量都会被视作模块的一个可见的成员。此外，其它存储期的变量也总是可见的。
+
+\begin{lstlisting}
+const MyModule = object {
+	auto x = 42;
+	{
+		auto y = 10;			// 不可见，因为 y 不构成当前对象表达式的内存位置
+	}
+	const z = 0;				// 可见，且拥有常量存储期
+};
+\end{lstlisting}
+
+如果要导入其它的模块，需要用到 \lstinline!import! 关键字。编译器会在给定的源文件中寻找同名的模块，从而在随后的访问时能够据此找到具体的名字。
+
+\begin{grammar}[\texttt{import} 语句] \label{grm:import-statement}
+\begin{enumerate}
+	\item \lstinline!import [module-id];!
+	\item \lstinline!import [module-id] including ([id-list]);!
+	\item \lstinline!import [module-id] excluding ([id-list]);!
+	\item \lstinline!import [dot-qualified-id-list];!
+\end{enumerate}
+\end{grammar}
+
+\begin{enumerate}
+	\item 导入一个模块，使这个模块名可见。这里的 \lstinline![module-id]! 是一个由多个点分隔的名字组成的表达式，如 \lstinline!a.b.c.d!。
+	\item 导入一个模块，并指定特定的模块成员可见。
+	\item 导入一个模块，并指定特定的模块成员外所有成员可见。
+	\item 导入一个模块中的一到多个成员。
+\end{enumerate}
+
+\begin{lstlisting}
+const ModuleSpace = object {
+	const MyModule = object {	// 相当于一个子模块，嵌套在外部模块 ModuleSpace 中
+		auto x = 42;
+	};
+};
+
+import ModuleSpace.MyModule;	// 读取同文件中的模块，将 MyModule 在当前作用域中可见
+
+const main = func () -> do {
+	print MyModule.x;			// 输出 42
+};
+\end{lstlisting}
+
+不过，如果我们想要将上面的代码复现到不同文件的模块上就会遇到问题：
+
+\begin{lstlisting}
+// my_module.as
+const ModuleSpace = object {
+	const MyModule = object {
+		auto x = 42;
+	};
+};
+
+// main.as
+import ModuleSpace.MyModule;
+
+const main = func () -> do {
+	print MyModule.x;			// 编译错误，MyModule 不可访问
+};
+\end{lstlisting}
+
+这也就引出了 AutoScript 中名字的可访问性。
+
+\subsection{访问修饰符}
+
+我们可以通过 \lstinline!import! 语句来让某个名字可见，但是当前作用域或许没有足够权限访问这个名字。这是因为 AutoScript 中所有名字都有\textbf{可访问性（Accessibility）}的概念。下面是所有的五种可访问性：
+
+\begin{itemize}
+	\item 导出访问性：用关键字 \lstinline!export! 表示。该名字会被导出当前模块，因此在任何地方都可访问。
+	\item 拓展访问性：用关键字 \lstinline!extend! 表示。该名字会在当前模块以及所有延展自当前类型的作用域中访问。
+	\item 内部访问性：用关键字 \lstinline!internal! 表示。该名字只在当前模块中可访问。
+	\item 局部访问性：用关键字 \lstinline!local! 表示，该名字只在当前作用域中可访问。
+	\item 私有访问性：用关键字 \lstinline!private! 表示，该名字无法被外界访问。
+\end{itemize}
+
+访问修饰符可以在任何变量声明的地方出现，并需要使用在存储限定符之前。如果没有对变量使用访问修饰符，则它会继承其所在名字空间的访问修饰符。特别地，全局模块中所有名字默认拥有局部访问性，而 \lstinline!do! 表达式和 \lstinline!monad! 表达式的语句块中所有名字默认拥有局部访问性，且其中自动存储期的变量最多只能拥有局部访问性。最后，名字空间中任何名字的访问性不能超过名字空间本身的访问性。下面是一些例子：
+
+\begin{lstlisting}
+export const Point = struct (x : Real, y : Real);	// Point 以及 x 和 y 都拥有导出访问性
+const main = func () -> do {	// main 拥有局部访问性
+	auto x = 42;			// x 拥有局部访问性
+	export auto y = 24;		// 编译错误：do 表达式中的自动存储期变量最多只能拥有局部访问性。
+	const z = 0;			// z 拥有局部访问性
+};
+\end{lstlisting}
+
+\subsection{模块别名}
+
+我们可以利用 \lstinline!alias! 关键字声明模块的别名。
+
+\begin{grammar}[模块别名] \label{grm:module-alias}
+\begin{enumerate}
+	\item \lstinline!alias [id] = import [module-id];!
+	\item \lstinline!alias [id] = import [dot-qualified-id];!
+\end{enumerate}
+\end{grammar}
+
+它本质上就是在导入模块后用别名语句设置别名。
+
+\begin{lstlisting}
+alias m = Math.min;
+
+const main = func () -> do {
+	print m(1, 2);		// 输出 1
+};
+\end{lstlisting}
+
+\subsection{部分模块}
+
+到现在为止我们接触到的模块特性有一个巨大的缺陷：所有的子模块必须定义在同一个文件中，这是因为它们必须同属一个 \lstinline!object! 表达式。这和大多数语言中模块的特点不同。为了支持将子模块定义在不同文件，AutoScript 引入了\textbf{部分对象（Partial Object）}的概念，这需要用到 \lstinline!@partial! 属性。
+
+\begin{lstlisting}
+// a.as
+@partial
+export const MyModule = object {
+	const SubModuleA = object {
+		auto x = 42;
+	};
+};
+// b.as
+@partial
+export const MyModule = object {
+	const SubModuleB = object {
+		auto x = 24;
+	};
+};
+// main.as
+import MyModule;
+
+const main = func () -> do {
+	print MyModule.SubModuleA.x;	// 输出 42
+	print MyModule.SubModuleB.x;	// 输出 24
+};
+\end{lstlisting}
+
+注意，每个部分对象的声明处都应该添加 \lstinline!@partial! 属性。

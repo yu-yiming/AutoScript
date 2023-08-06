@@ -1,0 +1,181 @@
+\documentclass[lang=cn, scheme=chinese, 10pt]{elegantbook}
+
+\title{AutoScript 编程语言}
+\author{萧茗葛}
+\date{April 2023}
+\version{0.1}
+\cover{Pictures/Jellyfish.jpg}
+
+\definecolor{codegreen}{RGB}{60, 155, 180}
+\definecolor{codepurple}{RGB}{215, 40, 205}
+\definecolor{codeviolet}{RGB}{102, 102, 234}
+
+\lstdefinelanguage{autoscript}{
+    keepspaces          = true,
+    columns             = flexible,
+    basicstyle          = {\normalsize\ttfamily},
+    showstringspaces    = false,
+    otherkeywords       = { ~, !, \#, \$, &, \', \\, ->, <-, ?, \%, :, =, ^, *, +, -, <, >, \, | },
+    keywordstyle        = \color{purple},
+    stringstyle         = \color{brown},
+    commentstyle        = \color{teal},
+    numbers             = left,
+    firstnumber         = 1,
+    numberstyle         = {\scriptsize\color{black}},
+    numbersep           = 5pt,
+    keywordstyle        = [0]{\color{codepurple}},
+    morekeywords        = [0]{
+        assert, assume, break, case, catch, continue, do, delete, else, fall, for, guard, if, implement, match, monad, print, requires, return, scan, then, throw, try, where, while, with, yield,
+    },
+    keywordstyle        = [1]{\color{blue}},
+    morekeywords        = [1]{
+        addrof, and, as, bitand, bitnot, bitor, decay, decayof, deref, derefof, exceptof, hasbase, hasclass, in, instof, keyof, kindof, nameof, next, not, of, or, protoof, sizeof, shl, shr, tagof, templof, typeof, union, xor,
+    },
+    keywordstyle        = [2]{\color{purple}},
+    morekeywords        = [2]{
+        alias, auto, class, const, data, equals, forall, from, func, is, new, object, static, struct, thread, type
+    },
+    keywordstyle        = [3]{\color{codeviolet}},
+    morekeywords        = [3]{
+    %   %a    %^     %!        $d       %d   %e      %<      %<~     %^=    %>      %?:    %int      %-    %loc   $?       %mv   %m   $o         %pri     %r   $t    $u
+        atom, await, comptime, default, dyn, except, export, extend, fixed, import, infer, internal, lazy, local, missing, move, mut, otherwise, private, ref, this, undefined,
+    },
+    keywordstyle        = [4]{\color{gray}},
+    morekeywords        = [4]{
+        branch, excluding, including, intrinsic, iteration, loop,
+    },
+    keywordsprefix      = @,
+    comment             = [l]{//},
+    morecomment         = [s]{/*}{*/},
+    morestring          = [d]{"},
+    alsoletter          = { _ },
+}
+
+
+\lstset{
+    language = autoscript,
+    tabsize = 4,
+    breaklines = true,
+    literate=%
+    {0}{{{\color{codeviolet}0}}}1
+    {1}{{{\color{codeviolet}1}}}1
+    {2}{{{\color{codeviolet}2}}}1
+    {3}{{{\color{codeviolet}3}}}1
+    {4}{{{\color{codeviolet}4}}}1
+    {5}{{{\color{codeviolet}5}}}1
+    {6}{{{\color{codeviolet}6}}}1
+    {7}{{{\color{codeviolet}7}}}1
+    {8}{{{\color{codeviolet}8}}}1
+    {9}{{{\color{codeviolet}9}}}1
+}
+
+
+\lstset{identifierstyle=\idstyle}
+
+\makeatletter
+\newcommand*\idstyle{%
+        \expandafter\id@style\the\lst@token\relax
+}
+\def\id@style#1#2\relax{%
+        \ifcat#1\relax\else
+                \ifnum`#1=\uccode`#1%
+                        \color{codegreen}
+                \fi
+        \fi
+}
+\makeatother
+
+% \newcommand\digitstyle{\color{codeviolet}}
+% \makeatletter
+% \newcommand{\ProcessDigit}[1]
+% {%
+%   \ifnum\lst@mode=\lst@Pmode\relax%
+%    {\digitstyle #1}%
+%   \else
+%     #1%
+%   \fi
+% }
+% \makeatother
+% \lstset{literate=
+%     {0}{{{\ProcessDigit{0}}}}1
+%     {1}{{{\ProcessDigit{1}}}}1
+%     {2}{{{\ProcessDigit{2}}}}1
+%     {3}{{{\ProcessDigit{3}}}}1
+%     {4}{{{\ProcessDigit{4}}}}1
+%     {5}{{{\ProcessDigit{5}}}}1
+%     {6}{{{\ProcessDigit{6}}}}1
+%     {7}{{{\ProcessDigit{7}}}}1
+%     {8}{{{\ProcessDigit{8}}}}1
+%     {9}{{{\ProcessDigit{9}}}}1
+%     {<=}{{\(\leq\)}}1,
+%     morestring=[b]",
+%     morestring=[b]',
+%     morecomment=[l]//,
+% }
+
+
+\begin{document}
+\maketitle
+\frontmatter
+\tableofcontents
+\mainmatter
+
+\part{基本知识}
+
+\chapter{开始使用 AutoScript}
+\input{Contents/Get Started with AutoScript}
+
+\chapter{变量和类型}
+\input{Contents/Variables and Types}
+
+\chapter{表达式}
+\input{Contents/Expressions}
+
+\chapter{语句}
+\input{Contents/Statements}
+
+\chapter{函数}
+\input{Contents/Functions}
+
+\chapter{结构}
+\input{Contents/Structures}
+
+\chapter{抽象数据类型与模式匹配}
+\input{Contents/Abstract Data Types and Pattern Matching}
+
+\part{AutoScript 标准库}
+
+\chapter{Prelude 库}
+\input{Contents/Prelude Library}
+
+\chapter{Math 库}
+
+\chapter{Containers 库}
+\input{Contents/Containers Library}
+
+\chapter{System 库}
+
+
+\part{高级知识}
+
+\chapter{名字空间与模块}
+\input{Contents/Namespaces and Modules}
+
+\chapter{单子与异常处理}
+\input{Contents/Monads and Error Handling}
+
+\chapter{动态类型与子类型系统}
+\input{Contents/Dynamic Types}
+
+\chapter{模版与元编程}
+\input{Contents/Templates and Metaprogramming}
+
+\chapter{AutoScript 编译器}
+\input{Contents/AutoScript Compiler}
+
+\appendix
+\part{附录}
+\input{Contents/Appendix}
+
+
+\end{document}

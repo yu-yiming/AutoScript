@@ -1,0 +1,561 @@
+\chapter{AutoScript 速成课}
+
+\section{C++ 读者}
+
+C++ 是 AutoScript 最相似的语言，因为作者本人对 C++ 较其它语言更为熟悉，因此在设计 AutoScript 时较多地参考了 C++ 中的性质。其中最显著的就是 \emph{RAII（Resource Acquisition Is Initialization）}；C++ 中的自动存储期变量就是 RAII 的杰作，而 AutoScript 名字的由来也正是取自“自动（Automatic）”一词 \footnote{当然，这个名字本身也是对 C++ 的调侃；C++11 后 \lstinline!auto! 的含义变为类型限定占用符，用于自动类型推导；它几乎降维打击了 C++ 一直以来（包括后面新加入）的复杂类型声明。甚至由于一开始就设计为和模版类型推导（基本）一致的规则，后续还自然地融入了非类型模版参数和缩略函数模版，程序员可以在你想到的大多数地方直接使用 \lstinline!auto!。因此 C++ 被揶揄为“AutoScript”。AutoScript 的取名有部分原因也是在于这个梗。}。除此之外，AutoScript 也借鉴了 C++ 中许多关键字，如果熟悉 C++ 或类似语言的读者可以很快地上手 AutoScript。
+
+\subsection{存储期}
+
+下面这个代码片段，如果忽略函数声明的部分，和 C++ 代码别无二致：
+
+\begin{lstlisting}
+const main = func () -> do {
+	auto x = 42;
+	auto f = 1.0;
+	auto s = "abc";
+};
+\end{lstlisting}
+
+不过，AutoScript 中的 \lstinline!auto! 和 C++ 中的含义完全不同：前者声明了变量的存储期，但后者声明了变量类型的推导方式。在 AutoScript 中，类型推导是不需要声明就有的；无论前面使用什么修饰符，编译器都会根据等号右侧的表达式类型推导出变量的类型。下面让我们展示其它的存储期限定符：
+
+\begin{lstlisting}
+auto x = 42;		// 自动存储期
+static y = 24;		// 静态存储期
+const z = 123;		// 常量存储期
+thread w = 456;		// 线程存储期
+new u = 789;		// 动态存储期
+\end{lstlisting}
+
+这里面，除了常量以外的存储期在 C++ 中都有对应。常量存储期是 AutoScript 中特地为编译器常量设置的存储期类型。编译器会视情况只在编译期为这些变量分配内存（有点类似于 C++ 的非内联静态常量）；其它情况下它们和静态存储期变量无异。
+
+
+\subsection{数组和元组}
+
+AutoScript 并没有内置的数组类型，但其拥有更加通用的元组类型。将任意类型的实体用逗号分隔都能构建一个元组对象；如果所有实体的类型相同，那么这就构成了一个数组。
+
+\begin{lstlisting}
+const main = func () -> do {
+	auto tup = (42, "abc");		// 类型是 (Int, String)
+	auto arr = (1, 2, 3);		// 类型是 (Int, Int, Int)
+};
+\end{lstlisting}
+
+这样的设计可以从对象的构建方式直接看出它的类型，相比 C++ 混乱的大括号初始化器要人性化许多。当然，对于较长的数组类型，我们不可能真的重复写这么多遍元素类型。一方面我们可以直接利用类型推断，只需要提供一个初始化表达式即可；另一方面我们可以使用标准库中的 \lstinline!Array! 类型。
+
+\begin{lstlisting}
+auto arr : Array(Int, 3);		// 声明了一个（C++ 中的） int[3] 类型
+\end{lstlisting}
+
+
+\subsection{函数和闭包}
+
+AutoScript 中的函数和 C++ 略有不同，偏要说的话它更类似于 C++ 中的闭包。函数可以通过函数表达式（对应 C++ 中的 lambda 表达式）定义：
+
+\begin{lstlisting}
+const id = func (x : Int) -> x;
+\end{lstlisting}
+
+我们通常需要用到 \lstinline!func! 关键字来提示编译器接下来是一个函数表达式。函数表达式中，包含了参数声明和一个函数体。和 C++ 不同的是，AutoScript 中的函数体是一个表达式。这样的设计让函数和它的类型一一对应：上面的例子中，函数的类型是 \lstinline!Int -> Int!，正好是左侧传入一个 \lstinline!Int! 参数，右侧返回一个 \lstinline!Int! 类型对象。得益于强大的类型推断系统，函数的返回类型也不需要显式给出，这和 C++ 中返回类型使用 \lstinline!auto! 占用符的函数是一样的。
+
+
+\subsection{结构类型}
+
+AutoScript 也使用 \lstinline!struct! 关键字来声明一个结构类型，不过和函数类似地，我们通过结构表达式来构建一个类型。
+
+\begin{lstlisting}
+const Pair = (
+	x : Int,
+	y : Int
+);
+\end{lstlisting}
+
+从形势来看，结构表达式是一个拥有具名成员的元组，实际上它确实和元组有很强的交互能力。
+
+\begin{lstlisting}
+const main = func () -> do {
+	auto p : Pair = (1, 2);				// 元组类型隐式类型转换为相同布局的任何结构类型。
+	auto tup : (Int, Int) = decay p;	// 相反方向可以通过 decay 函数得到
+};
+\end{lstlisting}
+
+默认情况下，结构类型中的所有成员都是可访问的，这点和 C++ 中一样。如果要限制成员的可访问性，可以在成员声明前添加访问修饰符。
+
+\begin{lstlisting}
+const MyStruct = struct (
+	private x : Int,			// x 只能在当前结构作用域中访问
+	local y : Int,				// y 只能在 MyStruct 所在作用域中访问
+	internal z : Int, 			// z 只能在 MyStruct 所在模块中访问
+	extend w : Int,				// w 可以在同模块或不同模块里的延展类型作用域中访问
+	export u : Int				// 可以在任何地方访问
+);
+\end{lstlisting}
+
+这里面，可以将 \lstinline!private!、\lstinline!extend! 和 \lstinline!export! 分别和 C++ 中的 \lstinline!private!、\lstinline!protected! 和 \lstinline!public! 相对应。
+
+\chapter{AutoScript 专有名词}
+
+\section{实体}
+
+AutoScript 中用\textbf{实体（Entity）}来称呼所有一等公民，即可以被当作数据处理的对象。
+
+\begin{itemize}
+    \item \textbf{对象（Object）}：最基本的对象，如整数、字符串、模块等。
+
+    \item \textbf{函数（Function）}：可以调用并成为可执行代码的对象。
+
+    \item \textbf{类型（Type）}：对应了实体的内存布局，可以用作标注某个实体的属性。如内置类型和结构类型。
+
+    \item \textbf{标签（Tag）}：对应了实体的特殊行为，可以用作标注某个实体的属性。
+
+    \item \textbf{模版（Template）}：实体的模版，可以在编译期或运行期进行代换称为上面四种实体之一。构成了 AutoScript 中的反射机制。
+\end{itemize}
+
+实体可以被绑定到一个\emph{名字}上，并由此成为一个\emph{变量}。在绑定之后，这个名字不能再次绑定到另一个实体上（不过不同的名字可以绑定的相同的实体上，这也就是\emph{别名}的概念），这也保证了同一个名字在程序中有唯一的内存地址对应。实体的名字可以通过关键字 \lstinline!nameof! 得到，其内存地址则需要使用关键字 \lstinline!addrof!。因此可以比较 \lstinline!nameof(a)! 和 \lstinline!nameof(b)! 或 \lstinline!addrof(a)! 和 \lstinline!addrof(b)! 来判断 \lstinline!a! 和 \lstinline!b! 是否有相同的名字（与内存地址）。 \\
+
+每个实体的名字是和它的\emph{名字空间}有关的。实际上，变量 \lstinline!a! 的实际名字是 \lstinline!::scope::chain::to::the::current::one::a!。其中 \lstinline!a! 的名字空间是它的最长前缀 \lstinline!::scope::chain::to::the::current::one!。我们可以通过 \lstinline!nameof! 关键字先得到变量的名字，随后再用字符串操作得到它的名字空间。 \\
+
+实体的\emph{值}是表示其含义的性质，在将实体用于表达式时，实体本身就代表了它的值。比如 \lstinline!42! 的值就是 \lstinline!42!（显然），\lstinline!(1, 2, 3)! 的值就是 \lstinline!(1, 2, 3)!。 \\
+
+任何实体都有一个编译期确定的\emph{类型}，这个类型要么是在变量声明时显式给出的，要么是通过初始化表达式\emph{类型推断}得到的。类型暗示了实体的\emph{内存布局}。实体的类型可以通过 \lstinline!typeof! 函数得到。因此可以比较 \lstinline!typeof(a)! 和 \lstinline!typeof(b)! 来判断 \lstinline!a! 和 \lstinline!b! 是否有相同的类型。 \\
+
+不过，类型只代表了一个实体的\emph{直接}内存布局，然而动态类型的存在让子类型可以共用同一个类型接口，此时实体可能属于完全不同的类型（称为\emph{实例类型}），但被声明为同一个动态基类。我们可以通过 \lstinline!instof! 函数得到其真实的类型。因此可以比较 \lstinline!instof(a)! 和 \lstinline!instof(b)! 来判断 \lstinline!a! 和 \lstinline!b! 是否有相同的实例类型。 \\
+
+对于选择类型或抽象数据类型的实体，它们虽然拥有相同的类型（显然）和实例类型（因为它不是动态类型），但它们的行为完全不同。此时可以通过函数 \lstinline!tagof! 来得到其标签。因此可以比较 \lstinline!tagof(a)! 和 \lstinline!tagof(b)! 来判断 \lstinline!a! 和 \lstinline!b! 是否有相同的标签。 \\
+
+对于任何函数，它有一个重要的属性，即\emph{类别}。类别代表了某个实体要经过多少次调用才能得到一个“不能继续调用”的实体，即常规的对象。可以通过 \lstinline!kindof! 来得到类别。因此可以比较 \lstinline!kindof(a)! 和 \lstinline!0! 来判断 \lstinline!a! 是否可调用。 \\
+
+对于被\emph{模版实例化}的实体，可以通过 \lstinline!templof! 得到其模版。因此可以比较 \lstinline!templof(a)! 和 \lstinline!templof(b)! 来判断 \lstinline!a! 和 \lstinline!b! 是否有相同的模版。 \\
+
+模版和函数类似，其类别大于零，因此可以通过 \lstinline!kindof! 判断某个实体是否为模版。通过比较 \lstinline!kindof(a)! 和 \lstinline!0! 可以判断 \lstinline!a! 是否可以继续特化。 \\
+
+下面让我们用一张表来展示实体拥有的所有性质。
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|c|c|l|} \hline
+        性质 & 解释 & 如何得到该性质 \\\hline\hline
+        名字 & 实体唯一绑定的名字 & \lstinline!nameof : T -> String! \\\hline
+        值 & 实体的含义 & 实体本身就等同于它的值 \\\hline
+        作用域 & 实体名字的最长前缀 & 无法得到这个性质 \footnotemark[1] \\\hline
+        存储期 & 实体的生命周期 & 无法得到这个性质 \footnotemark[1] \\\hline
+        可变性 & 实体是否可变 & 可以尝试通过 \lstinline!mut! 模式匹配实体 \footnotemark[2] \\\hline
+        原子性 & 实体的赋值操作是否为原子操作 & 可以尝试通过 \lstinline!atom! 模式匹配实体 \footnotemark[2] \\\hline
+        动态性 & 实体是否是动态类型 & 可以尝试通过 \lstinline!dyn! 模式匹配实体 \footnotemark[2] \\\hline
+        地址 & 实体的内存地址 & \lstinline!addrof : T -> Address! \\\hline
+        类型 & 实体的内存布局和特殊标签 & \lstinline!typeof : T -> Type! \\\hline
+        实例类型 & 实体的实际内存布局和特殊标签 & \lstinline!instof : T -> Type! \\\hline
+        内存大小 & 实体的直接内存占用 & \lstinline!sizeof : T -> Int! \\\hline
+        标签 & 实体的选择标签 & \lstinline!tagof : T -> Type! \\\hline
+        类别 & 实体的可调用性质 & \lstinline!kindof : T -> Int! \\\hline
+        模版 & 实体的抽象模版 & \lstinline!templof : T -> Template! \\\hline
+    \end{tabular}
+    \caption{实体的性质}
+    \label{tab:entity-properties}
+\end{table}
+
+\footnotetext[1]{虽然没有语言层面的函数得到这些性质，可以通过 \lstinline!Meta! 库中定义的\lstinline!Meta.scopeof! 和 \lstinline!Meta.storageof! 来得到实体的名字、作用域和存储期。}
+
+\footnotetext[2]{也可以通过 \lstinline!Meta! 库中定义的 \lstinline!Meta.ismut!、\lstinline!Meta.isatom! 和 \lstinline!Meta.isdyn! 来判断实体是否可变、原子和动态。}
+
+\section{表达式}
+
+AutoScript 中，\textbf{表达式（Expression）}是指一个可以经过\textbf{求值（Evaluation）}得到一个实体的结构。表达式本身并不是一个实体，它需要在编译期或运行期进行求值后才能得到一个实体，这个实体的值也称为表达式的值。在变量定义中，初始化表达式求值得到的实体会成为名字绑定的目标。 \\
+
+表达式没有名字，因此也没有内存地址。表达式的类型就是其求值后实体的类型，其它的如实例类型、内存大小等性质也可以类似得到 \footnote[3]{也就是说，比如 \lstinline!typeof(e)! 就是表达式 \lstinline!e! 求值后的类型。}。特别地，表达式拥有\emph{异常类型}，其描述了表达式中可能抛出异常的选择类型。我们可以通过 \lstinline!exceptof! 来得到表达式的异常类型。 \\
+
+表达式根据其求值行为，也可以分为不同类型：\lstinline!await! 令表达式并发执行；\lstinline!comptime! 令表达式编译期执行，而 \lstinline!lazy! 令表达式惰性执行。由于这些提示符并非表达式本身的性质，我们无法得知一个表达式是否并发、编译期或惰性执行。 \\
+
+下面让我们用一张表来展示表达式拥有的所有性质。
+
+\begin{table}[h]
+	\centering
+	\begin{tabular}{|c|c|l|} \hline
+		性质 & 解释 & 如何得到该性质 \\\hline\hline
+		值 & 表达式求值后实体的值 & 将表达式用于求值环境中 \\\hline
+		可变性 & 表达式求值后实体的可变性 & 可以尝试通过 \lstinline!mut! 模式匹配表达式 \\\hline
+        原子性 & 实体的赋值操作是否为原子操作 & 可以尝试通过 \lstinline!atom! 模式匹配表达式 \\\hline
+        动态性 & 实体是否是动态类型 & 可以尝试通过 \lstinline!dyn! 模式匹配表达式 \\\hline
+        类型 & 表达式求值后实体的类型 & \lstinline!typeof : T -> Type! \\\hline
+        异常类型 & 表达式的异常类型 & \lstinline!exceptof : T -> Type! \\\hline
+        实例类型 & 表达式求值后实体的实例类型 & \lstinline!instof : T -> Type! \\\hline
+        内存大小 & 表达式求值后实体的内存大小 & \lstinline!sizeof : T -> Type! \\\hline
+        标签 & 表达式求值后实体的选择标签 & \lstinline!tagof : T -> Type! \\\hline
+        类别 & 表达式求值后实体的可调用性质 & \lstinline!kindof : T -> Int! \\\hline
+        模版 & 表达式求值后实体的抽象模版 & \lstinline!templof : T -> Template! \\\hline
+        并发性 & 表达式是否并发执行 & 无法得到该性质 \\\hline
+        编译求值性 & 表达式是否编译期求值 & 无法得到该性质 \\\hline
+        惰性求值性 & 表达式是否惰性求值 & 无法得到该性质 \\\hline
+	\end{tabular}
+	\caption{表达式的性质}
+	\label{tab:expression-properties}
+\end{table}
+
+\chapter{关键字和元符号}
+
+下表中罗列了 AutoScript 中的所有关键字，其中包括上下文关键字。
+
+\begin{table}[h]
+	\centering
+	\begin{tabular}{|c c c c c c|} \hline
+		\multicolumn{6}{|c|}{A-C} \\\hline
+		\lstinline!addrof! & \lstinline!alias! & \lstinline!and! & \lstinline!as! & \lstinline!assert! & \lstinline!assume! \\
+		\lstinline!atom! & \lstinline!auto! & \lstinline!await! & \lstinline!bitand! & \lstinline!bitnot! & \lstinline!bitor! \\
+		\lstinline!branch! & \lstinline!break! & \lstinline!catch! & \lstinline!comptime! & \lstinline!const! & \lstinline!continue! \\\hline
+		\multicolumn{6}{|c|}{D-F} \\\hline
+		\lstinline!data! & \lstinline!decay! & \lstinline!decayof! & \lstinline!default! & \lstinline!delete! & \lstinline!deref! \\
+		\lstinline!derefof! & \lstinline!dyn! & \lstinline!else! & \lstinline!equals! & \lstinline!except! & \lstinline!exceptof! \\
+		\lstinline!excluding! & \lstinline!export! & \lstinline!extend! & \lstinline!fall! & \lstinline!fixed! & \lstinline!for! \\
+		\lstinline!forall! & \lstinline!from! & \lstinline!func! & & & \\\hline
+		\multicolumn{6}{|c|}{G-M} \\\hline
+		\lstinline!guard! & \lstinline!hasbase! & \lstinline!hasclass! & \lstinline!if! & \lstinline!implement! & \lstinline!import! \\
+		\lstinline!in! & \lstinline!including! & \lstinline!infer! & \lstinline!instof! & \lstinline!internal! & \lstinline!intrinsic! \\
+		\lstinline!iteration! & \lstinline!keyof! & \lstinline!kindof! & \lstinline!lazy! & \lstinline!local! & \lstinline!loop! \\\hline
+		\multicolumn{6}{|c|}{M-R} \\\hline
+		\lstinline!match! & \lstinline!missing! & \lstinline!monad! & \lstinline!move! & \lstinline!mut! & \lstinline!nameof! \\
+	    \lstinline!new! & \lstinline!next! & \lstinline!not! & \lstinline!of! & \lstinline!or! & \lstinline!otherwise! \\
+		 \lstinline!print! & \lstinline!private! & \lstinline!protoof! & \lstinline!ref! & \lstinline!requires! & \lstinline!return! \\\hline
+		\multicolumn{6}{|c|}{T-Z} \\\hline
+		\lstinline!scan! & \lstinline!sizeof! & \lstinline!shl! & \lstinline!shr! & \lstinline!static! & \lstinline!struct! \\
+		\lstinline!tagof! & \lstinline!templof! & \lstinline!then! & \lstinline!this! & \lstinline!thread! & \lstinline!throw! \\
+		\lstinline!try! & \lstinline!type! & \lstinline!typeof! & \lstinline!undefined! & \lstinline!where! & \lstinline!while! \\
+		\lstinline!with! & \lstinline!xor! & \lstinline!yield! & & & \\\hline
+	\end{tabular}
+	\caption{AutoScript 的关键字表}
+	\label{tab:autoscript-keywords}
+\end{table}
+
+AutoScript 考虑到上面一些关键字在某些场景下可能比较繁琐（比如作为类型修饰符的 \lstinline!atom dyn ref mut!），因此支持使用\textbf{元符号（Meta Symbol）}来等效替代这些关键字 \footnote{可以类比 C++ 中的 Altermative Keywords。}。此外，也允许程序员定义自己的元符号。元符号以字符 \lstinline!$!、\lstinline!%! 或 \lstinline!^! 开始，后面跟着零到多个字母及符号，直到第一个空白符为止。 \\
+
+首先是比较常用的，可以和符号互换的阐述关键字。它们本身支持用特定的符号序列代替这个关键字，但同时我们也可以使用元符号：
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|c c|c c|c c|c c|} \hline
+        \lstinline!alias! 	& \$ 或 \lstinline!^^!			& \lstinline!auto!  & \lstinline!!（空） 或 \lstinline!^a! & \lstinline!class! & \lstinline!?:!  或 \lstinline!%c! & \lstinline!const! & \lstinline|!| 或 \lstinline!^c! \\
+        \lstinline!data! 	& \lstinline!%! 或 \lstinline!%d! & \lstinline!equals! & \lstinline!=! & \lstinline!forall! & \lstinline!:!! & \lstinline!from! & \lstinline!<<=! \\
+        \lstinline!func! & \lstinline!\! 或 \lstinline!%f!  & \lstinline!is! & \lstinline!?! & \lstinline!new! 	& \lstinline!*! & \lstinline!object! & \lstinline!#:! 或 \lstinline!%o! \\
+        \lstinline!static! & \lstinline!'! 或 \lstinline!^s! & \lstinline!struct! & \lstinline!#! 或 \lstinline!%s! & \lstinline!thread! & \lstinline!''! 或 \lstinline!^t! & \lstinline!type! & \lstinline!:! \\\hline
+    \end{tabular}
+    \caption{阐述关键字和对应的符号}
+    \label{tab:my_label}
+\end{table}
+
+可以看到，除了和变量定义有关的连接符（\lstinline!equals!、\lstinline!forall!、\lstinline!from!、\lstinline!is!、\lstinline!new! 和 \lstinline!type!）外，其它符号都根据其性质（\% 开头的代表有修饰性，\$ 开头的代表其有指代性，其余的由 \^ 开头）和首字母决定的。 \\
+
+随后，我们可以用 \lstinline!%! 或 \lstinline!$! 开始的特定序列来替代一些关键字。下表列出了所有的情形：
+
+\begin{table}[h]
+	\centering
+	\begin{tabular}{|c c|c c|c c|c c|} \hline
+		\lstinline!atom! & \lstinline!%a! & \lstinline!await! & \lstinline!^a! & \lstinline!comptime! &\lstinline!^c! 和 \lstinline|^!| & \lstinline!default! & \texttt{\$d} 和 \lstinline!^~! \\\hline
+		\lstinline!dyn! & \lstinline!%d! & \lstinline!except! & \lstinline!^e! & \lstinline!export! & \lstinline!^<! & \lstinline!extend! & \lstinline!^+! \\\hline
+		\lstinline!fixed!：& \lstinline!^f! & \lstinline!import!：& \lstinline!^>! & \lstinline!infer!：& \lstinline!^! & \lstinline!internal!：& \texttt{\^\$} \\\hline
+		\lstinline!lazy!：& \lstinline!^l! & \lstinline!local!：& \texttt{\^\_} & \lstinline!missing!：& \texttt{\$}\lstinline!m! 和 \texttt{\$?} & \lstinline!move!：& \lstinline!^m! \\\hline
+		\lstinline!mut!：& \lstinline!%m! & \lstinline!otherwise!：& \texttt{\$o} 和 \texttt{\_} & \lstinline!private!：& \texttt{\^\_\_} & \lstinline!ref!：& \lstinline!%r! \\\hline
+		\lstinline!this!：& \texttt{\$t} 和 \texttt{\$\_} & \lstinline!undefined!:& \lstinline!\$u! 和 \lstinline!^-|! & & & & \\\hline
+	\end{tabular}
+	\caption{其它关键字的元符号}
+	\label{tab:other-keywords-metasymbol}
+\end{table}
+
+这里面比较特殊的有和访问修饰相关的 \lstinline!^<!（导出）、\lstinline!^+!（延展）、\lstinline!^$!（模块）、\texttt{\^\_}（局部）和 \texttt{\^\_\_}；和导出相对的 \lstinline!^>!（导入）；推导类型声明 \lstinline!^!。最后，对于常用的一些关键字，可以使用其它的元符号。 \\
+
+每个运算符也有它们的对应元符号：
+
+\begin{table}[h]
+	\centering
+	\begin{tabular}{|c c|c c|c c|c c|} \hline
+		\lstinline!addrof! & \lstinline!<:&:>! & \lstinline!and! & \lstinline!&&! & \lstinline!as! & \lstinline!::! & \lstinline!bitand! & \lstinline!/&/!
+	\end{tabular}
+\end{table}
+
+\chapter{AutoScript 的符号}
+
+% \begin{table}[h]
+%     \centering
+    \begin{longtable}{l l l r} \hline
+        运算符及符号 & 解释 & 用例 & 结合性 \\\lline{4}
+        \lstinline!::! & 域连接符 & \lstinline!scope::name! & 无  \\\lline{4}
+        \lstinline!.! & 点调用符 & \lstinline!expr.f! & 左 \\\lline{4}
+        \lstinline! ! & 函数调用 & \lstinline!f expr! & 右 \\
+        \lstinline!...! & 包展开运算符 & \lstinline!... expr! & 右 \\
+        \lstinline!addrof! & 取地址 & \lstinline!addrof expr! & 右 \\
+        \lstinline!bitnot! & 按位取反 & \lstinline!bitnot expr! & 右 \\
+        \lstinline!decay! & 退化 & \lstinline!decay expr! & 右 \\
+        \lstinline!decayof! & 退化类型 & \lstinline!decayof Type! & 右 \\
+        \lstinline!deref! & 解引用 & \lstinline!deref expr! & 右 \\
+        \lstinline!derefof! & 解引用类型 & \lstinline!derefof expr! & 右 \\
+        \lstinline!instof! & 实例类型 & \lstinline!instof expr! & 右 \\
+        \lstinline!keyof! & 结构成员 & \lstinline!keyof expr! & 右 \\
+        \lstinline!kindof! & 类别 & \lstinline!kindof expr! & 右 \\
+        \lstinline!not! & 逻辑非 & \lstinline!not expr! & 右 \\
+        \lstinline!protoof! & 原型 & \lstinline!protoof Type! & 右 \\
+        \lstinline!sizeof! & 内存大小 & \lstinline!sizeof Type! & 右 \\
+        \lstinline!tagof! & 标签类型 & \lstinline!tagof expr! & 右 \\
+        \lstinline!templof! & 模版类型 & \lstinline!templof Type! & 右 \\
+        \lstinline!typeof! & 类型 & \lstinline!typeof expr! & 右 \\\lline{4}
+        \lstinline!of! & 类型转换运算符 & \lstinline!Type of expr! & 右 \\\lline{4}
+        \lstinline!as! & 类型转换运算符 & \lstinline!expr as Type! & 左 \\
+        \lstinline!hasbase! & 基类检查运算符 & \lstinline!Type hasbase Type! & 左 \\
+        \lstinline!hasclass! & 类族检查运算符 & \lstinline!Type hasclass Class! & 左 \\\lline{4}
+        \lstinline!^! & 幂运算符 & \lstinline!expr ^ expr! & 左 \\\lline{4}
+        \lstinline!*! & 乘法运算符 & \lstinline!expr * expr! & 左 \\
+        \lstinline!/! & 除法运算符 & \lstinline!expr / expr! & 左 \\\lline{4}
+        \lstinline!+! & 加法运算符 & \lstinline!expr + expr! & 左 \\
+        \lstinline!-! & 减法运算符 & \lstinline!expr - expr! & 左 \\\lline{4}
+        \lstinline!bitand! & 按位与运算符 & \lstinline!expr bitand expr! & 左 \\
+        \lstinline!bitor! & 按位或运算符 & \lstinline!expr bitor expr! & 左 \\
+        \lstinline!shl! & 左移运算符 & \lstinline!expr shl expr! & 左 \\
+        \lstinline!shr! & 右移运算符 & \lstinline!expr shr expr! & 左 \\
+        \lstinline!xor! & 按位异或运算符 & \lstinline!expr xor expr! & 左 \\\lline{4}
+        \lstinline!in! & 包含运算符 & \lstinline!expr in expr! & 左 \\\lline{4}
+        \lstinline!<=>! & 三路比较运算符 & \lstinline!expr <=> expr! & 左 \\\lline{4}
+        \lstinline!<! & 小于运算符 & \lstinline!expr < expr! & 左 \\
+        \lstinline!<=! & 小于等于运算符 & \lstinline!expr <= expr! & 左 \\
+        \lstinline!>! & 大于运算符 & \lstinline!expr > expr! & 左 \\
+        \lstinline!>=! & 大于等于运算符 & \lstinline!expr >= expr! & 左 \\
+        \lstinline!==! & 等于运算符 & \lstinline!expr == expr! & 左 \\
+        \lstinline!<>! & 不等于运算符 & \lstinline!expr <> expr! & 左 \\\lline{4}
+        \lstinline!and! & 逻辑与运算符 & \lstinline!expr and expr! & 左 \\
+        \lstinline!or! & 逻辑或运算符 & \lstinline!expr or expr! & 左 \\\lline{4}
+        \lstinline!?=!（\lstinline!class!） & 类族提示符 & \lstinline!?: block! & 无 \\
+        \lstinline!%!（\lstinline!data!） & 抽象数据类型提示符 & \lstinline!% Choices! & 无 \\
+        \lstinline!\!（\lstinline!func!） & 函数提示符 & \lstinline!\ pattern -> expr! & 无 \\
+        \lstinline!#=!（\lstinline!object!） & 对象提示符 & \lstinline!#: block! & 无 \\
+        \lstinline!#!（\lstinline!struct!） & 结构提示符 & \lstinline!# pattern! & 无 \\\lline{4}
+        \lstinline!|! & 析取运算符 & \lstinline!Tag | Tag! & 左 \\
+        \lstinline!&! & 合取运算符 & \lstinline!Tag & Tag! 或 \lstinline!expr & expr! & 左 \\\lline{4}
+        \lstinline!>>! & 函数结合运算符 & \lstinline!expr >> expr! & 左 \\\lline{4}
+        \lstinline!<<! & 函数结合运算符 & \lstinline!expr << expr! & 右 \\\lline{4}
+        \lstinline!<-! & 赋值运算符 & \lstinline!expr <- expr! & 右 \\\lline{4}
+        \lstinline!->! & 函数连接符 & \lstinline!pattern -> expr! & 右 \\\lline{4}
+        \lstinline!,! & 逗号运算符 & \lstinline!expr, expr! & 右 \\\lline{4}
+        \lstinline!atom! & 原子修饰符 & \lstinline!atom expr! & 右 \\
+        \lstinline!atom?! & 通用原子修饰符 & \lstinline!atom? Type! & 右 \\
+        \lstinline!await! & 并发表达式修饰符 & \lstinline!await expr! & 右 \\
+        \lstinline!comptime! & 常量表达式修饰符 & \lstinline!comptime expr! & 右 \\
+        \lstinline!dyn! & 动态修饰符 & \lstinline!dyn expr! & 右 \\
+        \lstinline!dyn?! & 通用动态修饰符 & \lstinline!dync? Type! & 右 \\
+        \lstinline!infer! & 类型推断提示符 & \lstinline!infer id! & 右 \\
+        \lstinline!lazy! & 惰性表达式修饰符 & \lstinline!lazy expr! & 右 \\
+        \lstinline!move! & 移动提示符 & \lstinline!move id! & 右 \\
+        \lstinline!mut! & 可变修饰符 & \lstinline!mut expr! & 右 \\
+        \lstinline!mut?! & 通用可变修饰符 & \lstinline!mut? Type! & 右 \\
+        \lstinline!ref! & 引用修饰符 & \lstinline!ref expr! & 右 \\
+        \lstinline!ref?! & 引用可变修饰符 & \lstinline!ref? Type! & 右 \\\lline{4}
+        \lstinline!~! & 整体匹配提示符 & \lstinline!id ~ pattern! & 右 \\\lline{4}
+        \lstinline!!（\lstinline!auto!） & 自动存储修饰符 & \lstinline!id! & 无 \\
+        \lstinline|!|（\lstinline!const!） & 常量存储修饰符 & \lstinline|! id| & 无 \\
+        \lstinline!?!（\lstinline!is!） & 约束提示符 & \lstinline!Type ? pred! & 无 \\
+        \lstinline!'!（\lstinline!static!） & 静态存储修饰符 & \lstinline!' id! & 无 \\
+        \lstinline!''!（\lstinline!thread!） & 线程存储修饰符 & \lstinline!'' id! & 无 \\
+        \lstinline!:!（\lstinline!type!）& 类型提示符 & \lstinline!id : Type! & 无 \\\lline{4}
+        \lstinline!=>! & 函数连接符 & \lstinline!pattern => expr! \\\lline{4}
+        \lstinline!=!（\lstinline!equals!） & 等号 & \lstinline!pattern = expr! & 无 \\
+        \lstinline!<<=!（\lstinline!from!） & 单子析出 & \lstinline!pattern <<= expr! & 无 \\\lline{4}
+        \lstinline!assert! & 断言语句提示符 & \lstinline!assert expr! & 无 \\
+        \lstinline!assume! & 假设语句提示符 & \lstinline!assume expr! & 无 \\
+        \lstinline!delete! & 删除语句提示符 & \lstinline!delete id! & 无 \\
+        \lstinline!print! & 输出语句提示符 & \lstinline!print expr! & 无 \\
+        \lstinline!requires! & 约束子句提示符 & \lstinline!requires expr! & 无 \\
+        \lstinline!return! & 返回语句提示符 & \lstinline!return expr! & 无 \\
+        \lstinline!scan! & 输入语句提示符 & \lstinline!scan id! & 无 \\
+        \lstinline!throw! & 异常抛出语句提示符 & \lstinline!throw expr! & 无 \\
+        \lstinline!try! & 预演语句提示符 & \lstinline!try expr! & 无 \\
+        \lstinline!where! & 环境导入子句提示符 & \lstinline!where block! & 无 \\
+        \lstinline!yield! & 协程暂停语句提示符 & \lstinline!yield expr! & 无 \\\hline
+    \caption{AutoScript 中所有符号的优先级}
+    \label{tab:operator-information}
+    \end{longtable}
+% \end{table}
+
+
+\section{符号优先级的说明}
+
+\subsection{域连接符}
+a
+域连接符 \lstinline!::! 拥有最高的优先级，因为它实际上是名字的一部分。
+
+\begin{lstlisting}
+const Pair = struct (
+    x : Real,
+    y : Real
+);
+
+const main = func () -> do {
+    auto p : Pair = (1.0, 0.0);
+    print Pair::x(p);           // 输出 1.0
+};
+\end{lstlisting}
+
+这里 \lstinline!Pair::x! 比函数调用 \lstinline!x(p)! 拥有更高的优先级，因此会先组合前者。
+
+\subsection{点调用符}
+
+点调用符 \lstinline!.! 是触发 AutoScript 的点调用语法糖的一个机制。它拥有除了域连接符以外最高的优先级。
+
+\begin{lstlisting}
+const IntTransform = struct (
+    f : Int -> Int
+);
+
+const main = func () -> do {
+    auto t : IntTransform = func (x : Int) -> x;
+    print p.f(42);              // 输出 42
+};
+\end{lstlisting}
+
+这里 \lstinline!p.f! 比函数调用 \lstinline!f(42)! 拥有更高的优先级，因此会先组合前者。
+
+\subsection{函数调用和内置函数关键字}
+
+在两个名字或字面量间没有任何有实际意义的符号都会被理解为一个函数调用。它拥有除了域连接符和点调用符以外最高的优先级。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto id = func (x : Int) -> x;
+    print id 10 + id 20;        // 输出 30
+};
+\end{lstlisting}
+
+这里 \lstinline!id 10! 和 \lstinline!id 20! 比加法运算符 \lstinline!+! 拥有更高的优先级，因此会优先计算这两个函数调用。 \\
+
+内置函数（如 \lstinline!addrof! 等）拥有和函数调用运算符相同的性质，只不过这里的函数是一个关键字。
+
+\subsection{内置运算符关键字}
+
+内置运算符关键字是一些和运算符性质相同的关键字，它们拥有不同的运算优先级。第一层级是\lstinline!of! 运算符（注意这个运算符是右结合的）。其次是 \lstinline!as!、\lstinline!hasbase! 和 \lstinline!hasclass! 这三个运算符，再其次分别是按位、包含运算符，和逻辑运算符。这样的顺序有下面的考量：
+
+\begin{lstlisting}
+const main = func () -> do {
+    print 42 as Int8 + 24 as Int8;      // 输出 66
+    print Int32 of Int16 of 42 as Int8; // 输出 42
+    print 1 shl 3 in (1, 2, 3);         // 输出 True
+    print 1 in 1 and 2 in 2;            // 输出 True
+};
+\end{lstlisting}
+
+
+
+
+\chapter{AutoScript 的属性}
+
+\begin{longtable}{l p{4cm} p{3cm} p{4cm}} \hline
+		属性 & 参数说明 & 解释 & 用例 \\\hline
+		\lstinline!@alert(msg)! & \lstinline!msg : () -> ()! 为一个输出信息的函数 & 在某个语句抛出异常时调用给定的函数 & \lstinline!@alert(msg) assert [expr];! \\\hline
+		\lstinline!@capture(q)! & \lstinline!q : Prelude.Query! 为一个查询结构 & 为函数设置显式捕获 & \lstinline!func @capture(q) [pattern] -> [expr]! \\\hline
+		\lstinline!@choice! & - & 让 \lstinline!do! 表达式返回一个选择类型 & \lstinline!@choice do [block]! \\\hline
+		\lstinline!@ctor! & - & 让结构类型可以类似函数调用一样构建对象 & \lstinline!@ctor [var-decl];! \\\hline
+		\lstinline!@default(e)! & \lstinline!e : T! 为任意的字面量 & 为参数设定默认值 & \lstinline!@default(e) [pattern]! \\\hline
+		\lstinline!@impl(c)! & \lstinline!c : Class! 为一个类族 & 声明某个类型对特定类族的实现 & \lstinline!@impl(c) [func-decl]! \\\hline
+		\lstinline!@inline! & - & 让模块的名字被无修饰地导入进来 & \lstinline!@inline import [id];! \\\hline
+		\lstinline!@layout(T)! & \lstinline!T : Type! 为一个元组类型 & 为类型设定内存布局 & \lstinline!const [id] : @layout(T) Type;! \\\hline
+		\lstinline!@name(s)! & \lstinline!s : String! 为一个名字 & 为语句块指定名字 & \lstinline!@name(s) [block]!  \\\hline
+		\lstinline!@operator(n, a)! & \lstinline!n : Int! 为优先级，\lstinline!a : String! 为结合性 & \lstinline!@operator(n, a) [var-decl];! \\\hline
+		\lstinline!@prop(get, set)! & \lstinline!! & 设置结构属性 & \lstinline!@prop(get, set) [var-decl]! \\\hline
+		\lstinline!@stream(strm)! & \lstinline!strm : System.IO! 为文件流对象 & 为 IO 操作设置文件流 & \lstinline!@stream(strm) print [expr];! \\\hline
+	\caption{AutoScript 的属性}
+	\label{tab:attributes}
+\end{longtable}
+
+
+\chapter{AutoScript 设计历程}
+
+\section{括号}
+
+AutoScript 的所有符号中，有三个（对）最为特殊，它们是圆括号 \lstinline!()!、方括号 \lstinline![]! 和花括号 \lstinline!{}!。它们的特殊性在于它们分别都\emph{成对出现}。一些语言中并没有很好地区分这些括号，或为某种括号赋予了过多的含义。比如 C++ 中圆括号和花括号同样可以用于变量初始化，但另一方面圆括号和方括号都用于函数调用，圆括号本身还可以用于函数声明、表达式分组和类型转换，花括号本身也可以用于函数或类等结构的定义 \footnote{用 C++ 当作反面案例似乎有些过分了，因为大多数其它语言在括号滥用方面都好很多。但从最常见的圆括号来讲，绝大多数语言并没有将其表达式分组功能和函数调用功能分开。这不是一个严重的问题，但也是我们努力的方向。一个相对正面的案例便是 Haskell，然而它在\emph{运算符组}的语法上又显得特殊。}。 \\
+
+AutoScript 在设计之初对括号的作用经过深思熟虑。首先，圆括号作为表达式分组的功能已经深入人心，因此我决定保留。圆括号作为函数调用完全可以参考 Haskell 的设计，即让 \lstinline!f x! 这样分隔的两个部分就形成一个函数调用。此时常见的类如 \lstinline!f(a, b)! 的语法就可以看作 \lstinline!f! 被 \lstinline!(a, b)! 的调用，后者是一个二元组。这里的二元组也并非特殊的语法，只要将 \lstinline!,! 本身看作运算符，那么这里的括号依然行使运算符分组的功能。当然，\lstinline!f (a, b)! 和 \lstinline!f a, b! 的含义是不同的，因为函数调用拥有比逗号更强的优先级。 \\
+
+花括号常用于作用域的声明，不过 C++ 中，\cpp{enum} 和 \cpp{union}（匿名时）会将名字引入到所在空间，但 \lstinline!enum struct! 和 \lstinline!struct!（匿名时）就不会。这让花括号的含义变得扑朔迷离，或许它只是一个用于结构声明的符号。AutoScript 中，所有的花括号都引入一个作用域。无论是 \lstinline!do! 和 \lstinline!monad! 表达式，还是 \lstinline!object! 表达式与 \lstinline!where! 子句，它们都严格地构建了所在作用域的一个子作用域。 \\
+
+最后是方括号。其常用的含义是对数组等结构取下标或切片，但在 C++ 中也有 lambda 表达式捕获列表声明的作用。AutoScript 将重点放在“查询”这个操作上，允许方括号中出现比较复杂的语法结构；同时考虑 \lstinline!c[q]! 这样的用法应该理解为 \lstinline!c! 被 \lstinline![q]! 调用，所以编译器应该对 \lstinline![q]! 进行特殊处理从而能够调用 \lstinline!x!。因此，方括号本身是一个对象生成的语法糖，而 \lstinline!c(q)! 与 \lstinline!c[q]! 并没有本质上的区别。
+
+
+\section{break 和 continue 语句}
+
+大部分主流语言中都有 \lstinline!break! 和 \lstinline!continue! 语句，它们用来跳出或继续当前最内层的循环语句（比如 \lstinline!while! 和 \lstinline!for! 语句等）。不过存在嵌套的循环语句时，这些操作就显得笨拙。因此有必要利用名字属性来为作用域具名，然后让 \lstinline!break! 和 \lstinline!continue! 语句后可以添加一个名字作为跳转的目标。 \\
+
+具名作用域并不是循环语句的特权，因此我考虑了在非循环语句中使用跳转语句的可行性，并察觉到了它的价值。\lstinline!break! 语句可以用于跳出任何复合语句，\lstinline!continue! 语句可以用于无条件的循环语句。然而，这就让不带标签的跳转语句变得无用，因为通常来讲我们总是先进行某个判断（用 \lstinline!if! 语句），随后决定 \lstinline!break! 或 \lstinline!continue!，但如果这两个语句的目标是最内层的语句块，那么它们会被 \lstinline!if! 语句捕获。
+
+\begin{lstlisting}
+const main = func () -> do {
+	scan x : mut Int;
+	while (True) {
+		if (x == 42) {
+			break;			// 理应跳出 while 语句，但朴素实现是跳出 if 语句？
+		}
+		scan x;
+	}
+};
+\end{lstlisting}
+
+第一种解决方案是倡导使用子句，因为 \lstinline!if! 子句不引入新的作用域：
+
+\begin{lstlisting}
+const main = func () -> do {
+	scan x : mut Int;
+	while (True) {
+		break if (x == 42);
+		scan x;
+	}
+};
+\end{lstlisting}
+
+这个实现的缺点在于，当 \lstinline!if! 后的条件表达式过于复杂时，这种写法不太实际。同时，对其他语言更熟悉的程序员可能会下意识使用 \lstinline!if! 语句而非 \lstinline!if! 子句，此时两者之间（意料之外）的区别可能会造成迷惑。 \\
+
+第二种解决方案是让跳转语句默认跳转上一层语句块。
+
+\begin{lstlisting}
+const main = func () -> do {
+	scan x : mut Int;
+	while (True) {
+		if (x == 42) {
+			break;			// 和期待的行为一致
+		}
+		if (x > 42) {
+			if (x < 114) {
+				break;		// 糟糕，break 了外面的 if 语句
+			}
+		}
+		scan x;
+	}
+};
+\end{lstlisting}
+
+这个实现在很多情况下会符合我们的期待，但如果出现了多层判断，它的行为会再次偏离常识。 \\
+
+第三种解决方案是引入一个上下文关键字，\lstinline!loop!。当在跳转语句后使用这个关键字时，会跳出最内层的一个循环。
+
+\begin{lstlisting}
+const main = func () -> do {
+	scan x : mut Int;
+	while (True) {
+		if (x == 42) {
+			break loop;		// 没问题
+		}
+		if (x > 42) {
+			if (x < 114) {
+				break loop;	// 没问题
+			}
+		}
+	}
+};
+\end{lstlisting}
+
+类似地我们也可以引入 \lstinline!branch! 和 \lstinline!iteration! 上下文关键字用于跳出最内层的 \lstinline!if! 语句和 \lstinline!for! 语句。这个实现的问题在于相对不够简洁。不过我认为这是可以接受的折衷。 \\
+
+最终我采用的是第一种和第三种的结合，即不加标签的跳转语句默认跳出最内层的语句块，可以用 \lstinline!if! 子句来避免跳转语句被意外捕获，或使用上下文关键字 \lstinline!loop!、\lstinline!branch! 或 \lstinline!iteration! 来跳出指定的最内层语句块。
+
+
+\chapter{AutoScript 语法}
+
+\begin{longtable}{l|p{5cm}|p{6cm}} \hline
+	名字 & 解释 & 语法  \\\hline
+	\texttt{number-lit} & 整数或者小数字面量 & \texttt{0x[0-9A-Fa-f]+|[0-9]+ dot? [0-9]+} \\\hline
+	\texttt{string-lit} & 字符串字面量 & \texttt{" [\^"]* "} \\\hline
+	\texttt{id} & 标识符 & \texttt{[A-Za-z\_]+[A-Za-z0-9\_]*} \\\hline
+	\texttt{qualified-id} & 修饰名字 & \texttt{[id]?(::[id])*} \\\hline
+	\caption{AutoScript 语法}
+	\label{tab:grammar}
+\end{longtable}

@@ -1,0 +1,412 @@
+\begin{introduction}
+	\item 推导类型
+	\item 函数模版
+	\item 模版实例化
+	\item 结构模版
+	\item 抽象数据类型模版
+	\item 对象模版
+\end{introduction}
+
+\section{函数模版}
+
+\subsection{推导类型}
+
+在这个章节以前，我们遇到的所有显式类型声明都是类似于 \lstinline!x : T! 的形式，其中 \lstinline!T! 是一个已知的类型，编译器会将初始化表达式的值隐式转换为 \lstinline!T! 后绑定到 \lstinline!x! 上。如果我们希望编译器严格按照初始化表达式的类型声明变量，则可以将显式类型声明省略掉。不过有时候我们希望能够得到这个类型，此时就需要额外使用一次 \lstinline!typeof!：
+
+\begin{lstlisting}
+const main = func () -> do {
+	auto x = 42;
+	const T = typeof(x);
+};
+\end{lstlisting}
+
+AutoScript 中为上面这样的操作设置了一个语法糖：我们可以用关键字 \lstinline!infer! 在变量声明时同时声明一个 \textbf{推导类型（Inferred Type）}：
+
+\begin{lstlisting}
+const main = func () -> do {
+	auto x : infer T = 42;
+};
+\end{lstlisting}
+
+推导类型也可以出现在提前声明的地方。
+
+\begin{lstlisting}
+const main = func () -> do {
+	auto x : infer T;		// 声明了一个拥有推导类型 T 的变量 x，这样的实体也被称为对象模版
+};
+\end{lstlisting}
+
+在函数参数列表中，我们可以声明一个对象模版。编译器会根据函数调用处的参数类型来推断推导类型的实际类型 \footnote{注意 \lstinline!x : T! 和 \lstinline!x : infer T! 的相同和不同之处：两者都保证 \lstinline!x! 的类型是 \lstinline!T!，但前者（在 \lstinline!T! 已知时）会将初始化表达式隐式转换为 \lstinline!T!，后者则会通过初始化表达式的类型来确定 \lstinline!T!。}。
+
+\begin{lstlisting}
+const add = func (x : infer T, y : T) -> x + y;
+
+const main = func () -> do {
+	print add(1, 2);		// 输出 3
+	print add(1.0, 2.0);	// 输出 3.0
+};
+\end{lstlisting}
+
+在上面的例子中，我们只在参数 \lstinline!x! 后使用了推导类型的声明，因此编译器只会根据这个参数来推断 \lstinline!T!，至于 \lstinline!y! 则会尝试将传入的参数隐式转换为类型 \lstinline!T!。当然，我们也可以同时为 \lstinline!y! 声明推导类型 \lstinline!infer T!，此时编译器会强制要求两个参数的类型推断结果完全相同。
+
+\begin{lstlisting}
+const add = func (x : infer T, y : infer T) -> x + y;
+
+const main = func () -> do {
+	print add(1, 2.0);		// 编译错误，推导类型冲突
+};
+\end{lstlisting}
+
+诸如上面这些参数中包含推导类型的函数称为\textbf{函数模版（Function Template）}。函数模版中，可以省略推导类型的声明（即省略 \lstinline!infer! 关键字），此时编译器会将第一次出现的类型作为推导类型的推断标准。
+
+\begin{lstlisting}
+const add = func (x : T, y : T) -> x + y;
+// 上面的函数相当于 func (x : infer T, y : T) -> x + y
+\end{lstlisting}
+
+更简洁地，我们可以完全省略函数的参数类型声明，此时编译器会将每个这样的参数视作声明了一个推导类型。
+
+\begin{lstlisting}
+const add = func (x, y) -> x + y;
+// 上面的函数相当于 func (x : infer T, y : infer U) -> x + y
+\end{lstlisting}
+
+从函数上推导类型的简化形式可以反推对象模版（也就是最原始形式的推导类型）也可以省略 \lstinline!infer! 关键字，甚至推导类型声明 \footnote{细心的读者会想到，由于 \lstinline!auto! 本身可以被省略，那么莫非 \lstinline!x! 本身就是一个变量声明？在函数中确实是这样的，在其他地方也是如此。如果 \lstinline!x! 不曾被声明，那么 \lstinline!x;! 这个语法就构成了它的声明。显然这样的写法不应被提倡，但它的有效性是水到渠成的。}：
+
+\begin{lstlisting}
+const main = func () -> do {
+	auto x : T;				// 声明了一个对象模版
+	auto y;					// 声明了一个对象模版
+};
+\end{lstlisting}
+
+可以看到，函数模版为我们提供了一种轻松的函数声明方式。不过，编译器是怎样妥善处理不同参数造成的差异呢？这就引出了\emph{模版实例化}的概念。
+
+\subsection{模版实例化}
+
+编译器在遇到一个函数模版时，不会对其返回类型进行推断（因为它通常做不到）。在函数模版被调用时，编译器会根据参数类型生成一个模版的\textbf{实例化（Instantiation）}。实例化的可访问性与所在作用域和模版本身相同。
+
+\begin{lstlisting}
+const add = func (x, y) -> x + y;
+
+const main = func () -> do {
+	print add(1, 2);		// 编译器会实例化一个函数 add__Int__Int : (Int, Int) -> Int
+	print add(2.0, 0.0);	// 编译器会实例化一个函数 add__Real__Real : (Real, Real) -> Real
+};
+\end{lstlisting}
+
+因此，所有的模版函数在使用时实际上调用的是编译器生成的实例化函数。 \\
+
+实例化有时会失败，这是因为实例化的参数不一定满足模版中使用的函数（和运算符）的声明，或者函数本身有缺陷。此时会产生编译错误。
+
+\begin{lstlisting}
+const f = func (x) -> do {
+	return f(x);			// 不存在实例化时不会报错
+};
+
+const main = func () -> do {
+	f(42);					// 编译错误，无法推断 f 的类型，实例化失败
+};
+\end{lstlisting}
+
+这里让我们看向一个特别的情况：约束失败并不是实例化失败，它是模式匹配中常见的情形，编译器会自动跳转到下一个候选继续判断。
+
+\begin{lstlisting}
+const f : (infer T) -> T = guard
+	x :? Int -> x,
+	:? String -> "Hello, world",
+	otherwise -> undefined;
+	
+const main = func () -> do {
+	print f("abc");			// 输出 Hello, world
+};
+\end{lstlisting}
+
+\subsection{函数模版的本质}
+
+如果对一个函数模版使用 \lstinline!typeof! 函数，其结果可能有些出乎意料。
+
+\begin{lstlisting}
+const add = func (x, y) -> x + y;
+
+const main = func () -> do {
+	print typeof(add);		// 输出 (Type, Type) -> Unresolved
+};
+\end{lstlisting}
+
+可以看到虽然 \lstinline!add! 的类型确实是一个函数，但它却是接受两个常量存储期类型，并返回不确定类型 \lstinline!Prelude.Unresolved! 的函数。事实上，编译器在看到一个带有 \lstinline!infer! 的参数列表时，会将其作如下处理：
+
+\begin{lstlisting}
+const add = func (x, y) -> x + y;
+
+// 编译器会生成下面的代码
+const add = func (const T : Type, const U : Type) 
+	-> func (x : infer T, y : infer U) -> x + y;
+\end{lstlisting}
+
+对于这样接收的参数包含常量存储期的函数，在调用时可以跳过一步调用，并通过后续调用中的实际参数的类型推断来得到这些参数的值。这也就是模版实例化的本质。如果依靠 \lstinline!infer! 的层级超过了一次调用，则不能用来推断这些常量存储期的参数。
+
+\begin{lstlisting}
+const f = func (const T : Type, const U : Type) 
+	-> func (x : infer T) -> func (y : infer U) -> x + y;
+	
+const main = func () -> do {
+	f(2)(3);			// 错误，U 未初始化
+	f[U = Int](2)(3);	// 没问题
+};
+\end{lstlisting}
+
+\section{类型模版}
+
+\subsection{结构模版}
+
+在一个结构对象声明中，我们同样可以使用推导类型来标注一个范型成员。
+
+\begin{lstlisting}
+const Point = struct (
+	x : infer T,
+	y : T
+);
+
+const main = func () -> do {
+	auto p : Point = (1, 0);	// 类型为 Point [T = Int]
+};
+\end{lstlisting}
+
+观察 \lstinline!p! 的类型就会发现其形式类似于一个函数调用。确实，结构模版的本质也是一个函数：
+
+\begin{lstlisting}
+const Point = struct (x : infer T, y : T);
+
+// 编译器会生成下面的代码
+const Point = func (const T : Type) -> struct (x : infer T, y : T);
+
+const main = func () -> do {
+	auto p1 : Point = (1, 0);
+	auto p2 : Point[T = Int] = (1, 0);
+	auto p3 : Point(Int) = (1, 0);
+};
+\end{lstlisting}
+
+上面的 \lstinline!p2! 和 \lstinline!p3! 都是不需要模版知识就可以理解的显式类型声明；\lstinline!p1! 中 \lstinline!Point! 本来并不是一个类型，但借助于 AutoScript 的模版实例化机制，编译器会尝试将等号右侧的内容作为类型推断的依据。 \\
+
+这个性质也可以运用在带有 \lstinline!@ctor! 属性的函数上。
+
+\begin{lstlisting}
+@ctor
+const Pair = struct (x : infer T, y : T);
+
+// 编译器会生成下面的代码
+const Pair = func (const T : Type) -> struct (x : infer T, y : T);
+const Pair__ctor = func (x : infer T, y : T) -> (x, y) as Pair(T);
+
+const main = func () -> do {
+	auto p = Point(1, 0);
+	
+	// 编译器会生成下面的代码
+	auto p = Pair__ctor(1, 0);
+};
+\end{lstlisting}
+
+
+\subsection{抽象数据类型模版}
+
+以 \lstinline!Prelude.Option! 为例：
+
+\begin{lstlisting}
+const Option = data (Some infer T | Null);
+
+// 编译器会生成下面的代码
+@ctor
+const Some = func (const T : Type) -> struct (t : infer T);
+@ctor @eager
+const Null = func (const T : Type) -> struct ();
+const Option = func (const T : Type) -> Some[T] | Null;
+\end{lstlisting}
+
+ADT 表达式中出现的全是没有出现的标识符，其中 \lstinline!Some! 和 \lstinline!Null! 都是标签类型，而 \lstinline!T! 是一个模版类型。
+
+
+\section{类族}
+
+\subsection{类族表达式}
+
+本节中我们将介绍一种特殊的函数模版，它的实例化方式比较特殊。首先让我们看一个普通的函数模版：
+
+\begin{lstlisting}
+const add = func (x : T, y : T) -> x + y;
+\end{lstlisting}
+
+这里我们没有对 \lstinline!T! 做任何假设，但如果实例化时 \lstinline!T::+! 无定义，上面的函数在实例化时就会失败。这个检查是多次进行的，也即每次遇到一个 \lstinline!x + y! 时编译器都需要取搜索是否有函数 \lstinline!T::+! 并做出相应的反应。好消息是，我们有方法将这个结果“缓存”到一个地方。
+
+\begin{lstlisting}
+const add = func (x : T forall class { x : T; y : T; x + y; }, y : T) -> x + y;
+\end{lstlisting}
+
+这里我们用到了\emph{类族提示符} \lstinline!forall! 和类族表达式。由于 \lstinline!forall! 是一个阐述关键字，我们可以用符号 \lstinline|:!| 来代替它。
+
+\begin{grammar}[类族表达式 \texttt{[class-expr]}] \label{grm:class-expression}
+	\lstinline!class [block]!
+\end{grammar}
+
+简单来说，类族表达式就是一个代码块，不过其中存储了一个类似于缓存的机制：所有没有通过检测的类型都会被标记为 \lstinline!False!。当类族表达式中不存在任何推导类型时，它对任何类型都会输出 \lstinline!True! 或 \lstinline!False!（取决于其中的代码是否合法）。此时的类族没有任何意义。
+
+\begin{lstlisting}
+auto SimplyWrong = class {
+	x : String;
+	y : String;
+	x * y;
+};					// 编译器不会做任何事（虽然它会将 () 标记为 False
+
+const main = func () -> do {
+	print SimplyWrong ();			// 输出 False
+	print SimplyWrong (Int, Int);	// 输出 False
+};
+\end{lstlisting}
+
+我们通常只对拥有推导类型的类族表达式感兴趣：
+
+\begin{lstlisting}
+const Addable = class {
+	x : T;
+	y : T;
+	x + y;
+};
+\end{lstlisting}
+
+此时我们可以通过类族提示符将其用在任何函数声明中：
+
+\begin{lstlisting}
+const add = func (x : T forall Addable) -> x + y;
+\end{lstlisting}
+
+对比此前的代码可以看到我们只是将类族表达式声明为变量了而已。 \\
+
+当省略推导类型声明时，我们也可以直接将类族放在类型的位置上（为了简洁，我们使用的是符号 \lstinline|:!|）.
+
+\begin{lstlisting}
+const Printable = class {
+	x : T;
+	print x;
+};
+const print_twice = func (x :! Printable, y :! Printable) -> do {
+	print x;
+	print y;
+};
+\end{lstlisting}
+
+不过要注意上面这个例子对应的是 \lstinline!func (x, y) -> do { ... }! 的情形，因此 \lstinline!x! 和 \lstinline!y! 完全可以是不同类型的变量。如果要求两者的类型相同，可以先表明其中一个的类型所在的类族：
+
+\begin{lstlisting}
+const Addable = class { 
+	x : T;
+	y : T;
+	x + y;
+};
+const add = func (x : T forall Printable, y : T) -> x + y;
+\end{lstlisting}
+
+除了在函数参数中判断类族，我们也可以用内置运算符 \lstinline!hasclass! 来判断某个类型满足特定类族。
+
+\begin{lstlisting}
+const Addable = class {
+	x : T;
+	y : T;
+	x + y;
+};
+
+const main = func () -> do {
+	print typeof(1) hasclass Addable;	// 输出 True
+	print String hasclass Addable;		// 输出 False
+};
+\end{lstlisting}
+
+和函数参数中出现的类族一样，这里一经判断编译器就会将它记录下来，此后的判断不需要再检阅类族定义和类型定义来决定该类型是否满足这个类族了。
+
+\subsection{类族的实现}
+
+除了让函数在调用时判断类族是否被实现，我们也可以在任何时候用 \lstinline!implement! 语句来声明某个类型实现了类族中的全部要求。
+
+\begin{grammar}[\texttt{implement} 语句] \label{grm:implement-statement}
+	\lstinline!implement! \texttt{[class-id] [type-id];}
+\end{grammar}
+
+\begin{lstlisting}
+const Addable = class {
+	x : T;
+	y : T;
+	x + y;
+};
+const Pair = struct (
+	x : Int,
+	y : Int
+);
+
+implement Addable Pair;		// 错误，Pair 没有实现 + 运算符
+\end{lstlisting}
+
+上面出现的类型不必出现过完整定义：我们只要保证和类族相关的声明在 \lstinline!implement! 语句之前出现过，就能让上面的判断通过。
+
+\begin{lstlisting}
+const Addable = class {
+	x : T;
+	y : T;
+	add(x, y);
+};
+const Pair : Type;
+const add : (x : Pair, y : Pair) -> Pair;
+implement Addable Pair;		// 通过编译
+\end{lstlisting}
+
+虽然 \lstinline!implement! 语句可以出现在任何地方，但由于它只在声明所在的作用域生效，因此我们常常将它直接放在模块中。
+
+\begin{lstlisting}
+const Addable = class {
+	x : T;
+	y : T;
+	x + y;
+};
+implement Addable Int;
+implement Addable Real;
+\end{lstlisting}
+
+特别地，对于 \lstinline!@inline! 的模块，其中声明的 \lstinline!implement! 语句会在其所在作用域中也有效。因此，标准库 \lstinline!Prelude! 中的类族实现默认在所有文件中都有效。
+
+\subsection{多参数的类族}
+
+类族中可以出现多个模版参数，但从此前的例子可以看到，类族只能用于修饰一个类型，因此我们需要保证它在使用时只剩下一个未应用的参数。
+
+\begin{lstlisting}
+const Convertible = class {
+	f : From;
+	t : mut To;
+	t <- f;
+};
+
+const f = func (x forall Convertible[To = T], y : T) -> do {
+	auto res = mut y;
+	scan b : Bool;
+	if (b) {
+		res <- x;
+	}
+	return res;
+};
+\end{lstlisting}
+
+注意到上面我们虽然在 \lstinline!x! 和 \lstinline!y! 的类型声明中都使用了推导类型 \lstinline!T!，但它只会通过 \lstinline!y! 的类型来推断，这是因为类族中的参数不能参与类型推导（尽管它是第一次出现）。相同的道理也应用于其它各种模版。
+
+\subsection{类族与约束的对比}
+
+约束同样可以用在参数列表中，不过它不提供缓存机制；同时作为模式匹配的一部分，它不构成函数的\emph{原型}。与之相比的，类族可以用在函数类型声明中，并作为其类型的一部分。
+
+\begin{lstlisting}
+const Addable = class {
+	x : T;
+	y : T;
+	x + y;
+};
+
+const succ : (T forall Addable) -> T;
+const succ = (x : Int) -> x + 1;
+\end{lstlisting}
+

@@ -1,0 +1,425 @@
+任何编程语言的学习都从一个简单的程序开始，本章我们将尝试实现一个词频统计程序。
+
+\begin{introduction}
+    \item 变量的定义
+    \item 主函数
+    \item 类型
+    \item 注释
+    \item 标准输入和输出
+    \item \lstinline!if! 语句
+    \item \lstinline!while! 语句
+    \item \lstinline!for! 语句
+    \item 函数
+    \item 运算符
+    \item 元组
+    \item 结构
+\end{introduction}
+
+\section{Hello World 程序}
+
+让我们从最简单的 Hello World 程序来开始 AutoScript 的学习。任何 AutoScript 程序都需要至少有一个\emph{语句}。通常 AutoScript 要求代码中有一个 \lstinline!main! \emph{函数}，在经过编译后系统会尝试调用这个函数，并执行其中的代码。
+
+\begin{lstlisting}
+const main = func () -> do {
+    print "Hello, World!";
+};
+\end{lstlisting}
+
+虽然只有短短三行程序，但其中包含的知识点需要我们反复巩固才能深入理解，这里让我们逐个部分简单地说明它们的含义和作用。
+
+\begin{itemize}
+    \item \lstinline!const!：是一个\emph{存储类型限定符}，用来定义一个变量。特别地，\lstinline!const! 表示\emph{常量存储期}，常用于函数和类型的定义，我们这里先不细究其含义。类似这样拥有特殊含义的“单词”被称为\emph{关键字}。
+
+    \item \lstinline!main!：也就是我们的\textbf{主函数（Main Function）}，它是一个\emph{变量}。在 AutoScript 中，几乎所有的概念都可以绑定到一个名字上，此时它就成为了一个变量；关键字的名字不能用于变量绑定。主函数是程序的入口，系统会以\emph{调用}主函数作为程序运行的开始。
+
+    \item \lstinline!=!：是一个\textbf{分隔符（Delimiter）}，用来控制代码的结构。这里的 \lstinline!=! 用来定义变量，也被称为\emph{初始化器提示符}。
+
+    \item \lstinline!func!：是一个\emph{实体类别提示符}，其提示后续实体拥有的\emph{类别}。\lstinline!func! 也是一个\emph{阐述关键字}，我们可以用符号 \lstinline!\! 来代替这个关键字。
+
+    \item \lstinline!()!：一个空的\emph{函数参数列表}，这里用来声明函数的参数。对于我们上面的例子，不需要接受任何参数，因此圆括号中是空的。
+
+    \item \lstinline!->!：是一个\textbf{运算符（Operator）}。在 AutoScript 中有许多这样的连接符号，其将程序中的一些结构串联起来形成特殊的含义。对于函数来说，参数列表和函数体之间通过 \lstinline!->! 串联就得到一个\textbf{函数表达式（Function Expression）}。
+
+    \item \lstinline!do!：是一个关键字，用来声明一个 \lstinline!do! \emph{表达式}，后者是函数体常见的形式。在函数被调用时，\lstinline!do! 表达式的\emph{语句块}，即大括号包围的部分中所有语句会被依次执行。
+
+    \item \lstinline!{...}!：是一个语句块。写在 \lstinline!do! 关键字后可以构成一个 \lstinline!do! 表达式。
+
+    \item \lstinline!print!：是一个关键字，会将后面的内容打印在指定的输出窗口上。
+
+    \item \lstinline!"..."!：是一个\emph{字符串}，在 AutoScript 代码中，有必要区分名字和字符串：前者是一个关键字或变量，后者则是一份数据。AutoScript 中使用双引号来表示字符串。
+
+    \item \lstinline!;!：是一个分隔符，用来分开两个语句。
+\end{itemize}
+
+上面的程序会经过 AutoScript 编译器 \lstinline!asc! 编译后生成一个可执行文件，执行后就会在命令行中输出“Hello, World!” 。不过，如果直接在命令行中运行 \lstinline!asci!，则可以通过下面的代码来达到相同的效果：
+
+\begin{lstlisting}
+print "Hello, World!";
+\end{lstlisting}
+
+这是因为 \lstinline!asci! 是一个 REPL 程序，我们输入的所有指令都会被当场解释为某个中间代码，并通过 \lstinline!asci! \emph{解释}运行。由于 REPL 中一些代码的行为和常规程序不同，因此我们在需要使用 REPL 运行代码的例子会特别指出；没有特别说明时，都应该默认时常规的需要经过编译的代码。
+
+
+\section{输入和输出}
+
+\textbf{输入输出（IO）}并不是一个简单的概念，但是它们是从开始学习编程就一定会接触的编程语言知识。AutoScript 将标准输入输出纳入了\emph{语言特性}的范畴中，即我们不需要导入标准库来使用常规的输入输出操作；具体来说，我们可以通过 \lstinline!print! 和 \lstinline!scan! 关键字来进行 IO 操作。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x : Int = undefined;
+    scan x;
+    print x;
+};
+\end{lstlisting}
+
+这里出现了一个新的\emph{存储限定符} \lstinline!auto!，用来表示\emph{自动存储期}；它常用于普通数据类型变量的声明（比如一个整数或字符串等）。和 \lstinline!main! 函数不同的是，我们没有在变量名字后直接使用 \lstinline!=! 分隔符来直接定义它，而是使用 \lstinline!:! 分隔符来声明它的\textbf{类型（Type）}。 \\
+
+AutoScript 中所有变量都拥有类型，它描述了一个对象的内存布局和行为特点，从而有助于在编译时对代码的行为进行检测和优化。上面的例子中，我们让 \lstinline!x! 的类型为 \lstinline!Int!，并通过 \lstinline!undefined! 来作为它的初始值。程序运行到这里时，会为 \lstinline!x! 分配空间但不对其初始化；所有读取 \lstinline!undefined! 的行为都是未定义的 \footnote{\textbf{未定义行为（Undefined Behavior）}是 C/C++ 中臭名昭著的特性之一，不过有的时候它也非常合理。AutoScript 中我们既然都字面意义上暗示了 \lstinline!undefined! 相关行为是未定义的，因此（或许）它能警示到更多人。}。好在随后我们将其交给了 \lstinline!scan! 语句，后者会根据命令行中的输入来为 \lstinline!x! 赋值。 \\
+
+AutoScript 提供了一个更加方便的语法来从标准输入读取内容。
+
+\begin{lstlisting}
+const main = func () -> do {
+    scan x : Int;
+    print x;
+};
+\end{lstlisting}
+
+如上面所示，我们可以在 \lstinline!scan! 语句中直接声明一个变量，它会通过输入的内容来初始化。这样就不用担心在变量声明到使用 \lstinline!scan! 语句之间误用变量了。这个技巧不仅限于 \lstinline!scan! 语句中，不过碍于篇幅让我们先记住它在 \lstinline!scan! 语句中的便捷使用。
+
+
+\section{空格和注释}
+
+读者或许已经注意到，前面的示例代码中，我们采用了特定的格式，比如在 \lstinline!do! 表达式的语句块中会换行并缩进、函数体中的语句每个都占用一行、关键字和符号之间用空格分开等。实际上这只是一个编写习惯。AutoScript 的名字和符号之间不会受空格和换行的影响。因此，下面的代码也是合法的：
+
+\begin{lstlisting}
+const
+    main = func
+() -> do { print "Hello, World"
+;}
+\end{lstlisting}
+
+当然，这绝不是我们推荐的写法。通常来讲，代码应该通过换行和缩进来提示其结构，建议使用本文中使用的风格。 \\
+
+除了空格之外，AutoScript 也会忽略\textbf{注释（Comment）}的存在。一共有两种注释，其一是行内注释，可以出现在每一行代码的末尾；其二是行间注释，可以出现在任何空格允许出现的地方。
+
+\begin{lstlisting}
+// 主函数
+const main = func /* 参数列表 */ () -> {
+    /*
+        这里什么都没有写
+     */
+};
+\end{lstlisting}
+
+注释在代码中比较常见，它用来解释抽象的程序行为。
+
+
+\section{控制流}
+
+程序通常是从前到后依次执行的。不过在一些情况下，我们需要选择地执行部分代码，或重复执行部分代码，此时需要一些\emph{控制流语句}来描述代码行为。本节中介绍其中最常用的三种。
+
+\subsection{if 语句}
+
+程序中，我们时常会根据某个条件来判断是否要执行一些语句，比如我们根据工资的多少来决定税收的比重。
+
+\begin{lstlisting}
+const main = func () -> do {
+    scan income : Int;
+    if (income < 2000) {
+        print "不需要缴税";
+    }
+    if (income >= 2000 and income < 8000) {
+        print "需要缴 5% 税";
+    }
+    if (income >= 8000 and income < 20000) {
+        print "需要缴 10% 税";
+    }
+    if (income >= 20000) {
+        print "需要缴 20% 税";
+    }
+};
+\end{lstlisting}
+
+可以看到，\lstinline!if! 语句包含了 \lstinline!if! 关键字、一个由圆括号包围的判断表达式，还有一个语句块。当判断表达式求值为真时，就会执行语句块中的代码。此外，上面用到了 \lstinline!<! 和 \lstinline!>=! 运算符，它们的含义和数学中的小于和大于等于相同，而逻辑运算符 \lstinline!and! 当两边同时成立时才判断为真。
+
+
+\subsection{while 语句}
+
+\lstinline!while! 语句会按照某个条件重复执行一串代码，参考下面的“猜数游戏”：
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto x = Math.randint(0, 100);
+    print "Guess a number between 0 and 100 (excluded)";
+    scan guessed : mut Int;
+
+    while (guessed <> x) {
+        if (guessed < x) {
+            print "Try a bigger one!";
+        }
+        else {
+            print "Try a smaller one!";
+        }
+        scan guessed;
+    }
+    print "Congrats! You've nailed it!";
+};
+\end{lstlisting}
+
+和 \lstinline!if! 语句类似地，\lstinline!while! 语句由 \lstinline!while! 关键字、一个圆括号包围的表达式还有一个语句块组成。执行到这个语句时，会首先判断表达式是否为真，若是则执行一次语句块，随后再次进行判断。直到判断条件为假前，循环会被不断执行。此外，上面用到了 \lstinline!<>! 运算符，它判断两个数是否不相等。我们也用到了 \lstinline!else! 子句，它紧跟在一个 \lstinline!if! 语句后，如果后者的判断条件为假，则会进入 \lstinline!else! 子句的语句块中。 \\
+
+上面的例子中值得特别说明的是，我们将 \lstinline!guessed! 声明为 \lstinline!mut Int! 类型，这里的 \lstinline!mut! 是一个\emph{类型修饰符}，其声明这个类型的对象是可变的。AutoScript 中默认所有变量都是不可变的，除非其被 \lstinline!mut! 修饰。由于我们在每次循环中都通过 \lstinline!scan! 语句重新对其赋值，因此需要将器声明为可变的 \footnote{此前我们使用 \lstinline!scan! 初始化的变量并不需要声明为 \lstinline!mut!，这是因为可变性只在初始化之后才有意义。}。
+
+\subsection{for 语句}
+
+对于一个\emph{范围}，我们可以通过 \lstinline!for! 语句遍历其中的元素。下面让我们以数组类型为例。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto arr : Int[3] = (1, 2, 3);
+    for (e : Int from arr) {
+        print e;
+    }
+};
+\end{lstlisting}
+
+这里，\lstinline!Int[3]! 表示拥有三个 \lstinline!Int! 对象的数组类型，其初始化为三个连续的元素 \lstinline!1, 2, 3!。\lstinline!e : Int from arr! 是一个比较复杂的结构，这里可以理解成声明了变量 \lstinline!e : Int! 后依次从 \lstinline!arr! 中取出元素。
+
+
+\section{函数和运算符}
+
+本节让我们简单介绍一下\textbf{函数（Function）}的定义和功能。函数可以看作是一个\emph{子程序}，它拟接受一系列\emph{参数}，并对一个表达式求值。当我们\textbf{调用（Invoke）}一个函数时，会将调用处的\textbf{参数（Argument）}用于初始化函数参数列表中的变量，并执行函数体。
+
+\begin{lstlisting}
+const add = func (x : Int, y : Int) -> x + y;	// 函数返回 x + y 的值
+
+const main = func () -> do {
+    scan a : Int;
+    scan b : Int;
+    print add(a, b);
+};
+\end{lstlisting}
+
+上面的程序中，\lstinline!add! 和 \lstinline!main! 都是函数。在 \lstinline!main! 函数体中我们调用了 \lstinline!add! 函数，其语法是函数名紧跟一个数对 \lstinline!(a, b)!。调用函数时需要保证和参数列表中参数个数和对应的类型相同 \footnote{后面我们会学习特殊的情况，但这里先认为参数必须严格遵守函数定义}。 \\
+
+运算符则是一类特殊的函数，它以中缀的形式调用。但在定义运算符时，和定义函数时没有太大区别。
+
+\begin{lstlisting}
+const <+> = func (x : Int) -> func (y : Int) -> x^2 + y^2;
+
+const main = func () -> do {
+    print 1 <+> 2;
+};
+\end{lstlisting}
+
+注意到这里我们让函数返回了一个函数。这没有任何问题，因为函数本身也是一个对象。所有类似于 \lstinline!* -> * -> *! 的函数都称为\emph{运算符}，它需要连续进行两次调用才能得到一个确切的值。从这个角度来看，\lstinline!a @ b!（其中 \lstinline!@! 是一个运算符）实际上是 \lstinline!@ a b! 的\textbf{语法糖（Syntax Sugar）}，编译器会在编译时将其转化为实际的形式。  \\
+
+无论是函数还是运算符，它们在 AutoScript 中的地位都和普通的对象无异：我们可以将其作为函数参数传递。
+
+\begin{lstlisting}
+const transform_twice = func (f : Int -> Int, x : Int) -> f(f(x));
+const operate_reverse = func (op : Int -> Int -> Int, x : Int, y : Int) -> op(y, x);
+const <-> = func (x : Int, y : Int) -> x - 2*y;
+
+const main = func () -> do {
+	print transform_twice(func (x : Int) -> x^2, 2);		// 输出 16
+	print operate_reverse(<->, 24, 42);						// 输出 -6
+};
+\end{lstlisting}
+
+上面的类型 \lstinline!Int -> Int! 表示了接受一个整数并返回一个整数的函数类型，可以看到 \lstinline!->! 在类型中的位置对应了函数声明时 \lstinline!->! 的位置。
+
+
+\section{元组和结构类型}
+
+AutoScript 中可以利用\textbf{元组（Tuple）}类型将多个类型按顺序排列在一起。元组可以通过逗号运算符 \lstinline!,! 构建。
+
+\begin{lstlisting}
+const main = func () -> do {
+    auto tup = 42, "abc";
+    print tup[0];
+    print tup[1];
+};
+\end{lstlisting}
+
+逗号运算符会将两个对象并列存储在一起，并返回这个元组对象。出于良好的习惯，此后所有的元组都会用圆括号包围 \footnote{这是因为逗号运算符的优先级比较低，容易被其它运算符影响}。从上面的代码中可以看到，我们可以通过 \lstinline!t[N]! 的形式来取得元组的某个元素，这是一个特殊的调用语法，让我们在后续章节再详细介绍 \footnote{实际上，\lstinline!t(N)! 也完全可以得到相同的结果，但为了符合主流语言的习惯，我们会使用方括号来取元素。}。 \\
+
+AutoScript 中，可以使用\textbf{结构（Structure）}来定义元组的模版；在结构中，我们可以为元组的每个元素命名。
+
+\begin{lstlisting}
+const Point = struct (x : Real, y : Real);
+
+const main = func () -> do {
+    auto p : Point = (1.0, 0.0);
+    print p.x;					// 访问第一个元素
+    print p.y;					// 访问第二个元素
+};
+\end{lstlisting}
+
+可以看到，结构也可以声明为一个变量。在定义特定结构类型的变量时，需要显式写出他的类型。结构类型的变量可以通过特殊的调用语法来访问它的元素，比如上面的 \lstinline!p.x! 就是访问了 \lstinline!p! 中被命名为 \lstinline!x! 的元素。 \\
+
+一些结构上适合定义\textbf{方法（Method）}，所谓方法是绑定在特定对象上的函数。
+
+\begin{lstlisting}
+const Point = struct (x : Real, y : Real);
+const reset = func (this p : ref mut Point) -> do {
+    p.x <- 0.0;
+    p.y <- 0.0;
+};
+
+const main = func () -> do {
+    auto p : mut Point = (1.0, 0.0);
+    p.reset();			// 相当于 reset(p)
+    print p.x;          // 输出 0.0
+};
+\end{lstlisting}
+
+上面通过用 \lstinline!this! 修饰参数来让函数能通过符号 \lstinline!.! 的方法调用，这也是一个语法糖。在看到 \lstinline!p.reset! 时，编译器会生成一个表达式，其可以通过空对象 \lstinline!()! 得到我们想要的结果。可以参考下面的代码。
+
+\begin{lstlisting}
+const Point = struct (x : Real, y : Real);
+const reset = func (this p : ref mut Point) -> do {
+	p.x <- 0.0;
+	p.y <- 0.0;
+};
+
+// 编译器会生成类似下面的代码
+const compiler_generated_reset = func (p : ref mut Point) -> func () -> do {
+	p.x <- 0.0;
+	p.y <- 0.0;
+};
+
+const main = func () -> do {
+	auto p : mut Point = (1.0, 0.0);
+	p.reset();
+	
+	// 编译器会生成类似下面的代码
+	compiler_generated_reset(p)();
+};
+\end{lstlisting}
+
+
+\section{标准库}
+
+编写 AutoScript 程序时，标准库是非常有用的帮手。我们不需要从头手动编写许多工具，因为它们已经在标准库中存在了。 \\
+
+下面我们罗列一些常用的标准库部分和它们的作用。
+
+\begin{itemize}
+    \item \lstinline!Prelude! 库：其中包含了许多 AutoScript 必须的组件，包括 \lstinline!Prelude.Bool! 类型、\lstinline!Prelude.Proxy! 类型等。这个库会默认被 \lstinline!import! 到每个 AutoScript 文件中并\emph{内联}，即我们可以直接使用 \lstinline!Bool! 来表示 \lstinline!Prelude.Bool!。
+
+    \item \lstinline!Math! 库：其中包含了常用的数学函数，如 \lstinline!Math.max!、\lstinline!Math.sin! 等。
+
+    \item \lstinline!System! 库：其中包含了和系统底层交互的函数，包括一些和 C/C++ 接口交互的函数。
+
+    \item \lstinline!Containers! 库，其中包含了许多常用的容器和数据结构。
+
+    \item \lstinline!Meta! 库，其中包含了许多和反射相关的组件。
+\end{itemize}
+
+如果想要引入某个标准库，需要使用 \lstinline!import! 关键字。
+
+\begin{lstlisting}
+import Math;
+
+const main = func () -> do {
+    print Math.sin(42)^2 + Math.sin(42)^2;  // 输出 1
+};
+\end{lstlisting}
+
+本章中我们暂时不对上面提到的标准库详细介绍；后续章节在用到其中的组件时再进行解释。
+
+\section{其它特性}
+
+
+
+\section{一个词频统计程序}
+
+首先，我们需要指定文件中读取文本。
+
+\begin{lstlisting}
+import System.IO;
+
+const read_from = func (filename : String) -> do {
+    auto file = IO.open(filename, "r");
+    if (file == undefined) {
+        throw "Cannot open file.";
+    }
+    return file.text();
+};
+\end{lstlisting}
+
+这个返回的文本拥有 \lstinline!String! 类型，因此我们可以利用 \lstinline!split! 方法来根据空格或标点符号将其分开。
+
+\begin{lstlisting}
+const get_words = func (this text : String) -> do {
+    const delim = func (ch : String) -> is_space(ch) or is_punct(ch);
+    return text.split(delim);
+};
+\end{lstlisting}
+
+随后，利用 \lstinline!HashTable! 容器来统计每个单词出现的次数。
+
+\begin{lstlisting}
+const count_words = func (this words : Vector(String)) -> do {
+    auto table : mut HashTable(String, Int) = default;
+    for (w : String from words) {
+        if (not table.contains(w)) {
+            table[w] <- 0;
+        }
+        table[w] <- table[w] + 1;
+    }
+    return table;
+};
+\end{lstlisting}
+
+随后，我们需要关于 \lstinline!HashTable! 键值对中的值进行排序。为此可以使用 \lstinline!PriorityQueue! 容器。
+
+\begin{lstlisting}
+const comparator = func (x : (String, Int), y : (String, Int)) 
+    -> x[1] < y[1] or (x[1] == y[1] and x[2] < y[2]);
+
+const sort_counts = func (this table : HashTable(String, Int)) -> do {
+    auto queue : mut PriorityQueue((String, Int), comparator) = default;
+    for (e : (String, Int) from table) {
+        queue.push(e);
+    }
+    return queue;
+};
+\end{lstlisting}
+
+最后，可以根据输入的数量来输出前几位词频的单词。
+
+\begin{lstlisting}
+const most_frequent = func (queue : PriorityQueue((String, Int), comparator), k : Int) -> do {
+    auto words : mut Vector(String) = default;
+    auto i : mut Int = 0;
+    while (i < k and not queue.is_empty()) {
+        words.append(queue.top()[0]);
+        i <- i + 1;
+    }
+    return words;
+};
+\end{lstlisting}
+
+现在利用上面所有的函数，我们可以写出下面的程序：
+
+\begin{lstlisting}
+const main = func () -> do {
+    print "Input the text file to read: ";
+    scan filename : String;
+    print "Input the k for the most frequent k words: ";
+    scan k : Int;
+
+    auto words = read_from(filename)
+                .get_words()
+                .count_words()
+                .sort_counts()
+                .most_frequent(k);
+    for (w : String from words) {
+        print w;
+        print "\n";
+    }
+};
+\end{lstlisting}

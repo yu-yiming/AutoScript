@@ -1,0 +1,108 @@
+\begin{introduction}
+    \item \lstinline!Prelude.Bool!
+\end{introduction}
+
+\section{Prelude 库概览}
+
+\lstinline!Prelude! 是所有 AutoScript 文件默认导入且\emph{内联}的库，其中包含了许多必要的组件。如果想要去除某些组件，可以显式导入 \lstinline!Prelude! 并用 \lstinline!excluding! 关键字指定特定的名字。
+
+\begin{lstlisting}
+@inline
+import Prelude excluding (Bool);        // 禁用 Prelude.Bool
+const main = func () -> do {
+    auto b = True;          // 错误，True 未被导入
+};
+\end{lstlisting}
+
+我们不推荐禁用任何 \lstinline!Prelude! 中的组件，这可能会导致部分的语言特性无法正常使用。
+
+\section{内置类型扩展}
+
+\subsection{Bool 类型}
+
+\lstinline!Prelude.Bool! 是一个抽象数据类型，它包含 \lstinline!True! 和 \lstinline!False! 两个标签。
+
+\begin{lstlisting}
+export const Bool = data True | False;
+\end{lstlisting}
+
+AutoScript 中所有表达式判断都依赖于 \lstinline!Prelude.Bool!。某种意义上，它本应是一个内置的类型。但由于它是一个典型的抽象数据类型，且为了减少语言中不必要的关键字，我将其加入到 \lstinline!Prelude! 库中。 \\
+
+\lstinline!Prelude.Bool! 实现了 \lstinline!Printable! 和 \lstinline!Scannable! 类族，因此我们可以用 \lstinline!print! 和 \lstinline!scan! 语句进行输入输出操作。
+
+\begin{lstlisting}
+export const serialize = func (b : Bool) -> b and "True" or "False";
+export const deserialize = func (s : String) -> s == "False" and False or True;
+
+implement Printable Bool;		// 声明 Bool 实现了 Printable 类族
+implement Scannable Bool;
+\end{lstlisting}
+
+\subsection{IntN 类型}
+
+\lstinline!Prelude! 中定义了几个定长的整数类型，用来扩展内置的 \lstinline!Int! 类型。它们包括 \lstinline!Int8!、\lstinline!Int16!、\lstinline!Int32! 和 \lstinline!Int128!。如其名称所暗示的，它们的内存大小就是 \lstinline!8!、\lstinline!16!、\lstinline!32! 和 \lstinline!128! 比特。
+
+\begin{lstlisting}
+export const Int8 = intrinsic;
+export const Int16 = intrinsic;
+export const Int32 = intrinsic;
+export alias Int64 = Int;
+export const Int128 = intrinsic;
+\end{lstlisting}
+
+这些类型的实际实现是编译器决定的，不过显然它们可以对应汇编指令集中的特定整数类型。这些类型都实现了 \lstinline!Integral! 类族，因此它可以进行所有整数的算术操作。下面以 \lstinline!Int8! 为例：
+
+\begin{lstlisting}
+export const + : Int8 -> Int8 -> Int8 = intrinsic;
+export const neg : Int8 -> Int8 = intrinsic;
+export const - : Int8 -> Int8 -> Int8 = x -> y -> x + (neg y);
+export const * : Int8 -> Int8 -> Int8 = intrinsic;
+export const div : Int8 -> Int8 -> (Int8, Int8) = intrinsic;
+export const / : Int8 -> Int8 -> Int8 = x -> y -> (x `div` y)[0];
+export const mod : Int8 -> Int8 -> Int8 = x -> y -> (x `div` y)[1];
+
+implement Integral Int8;
+\end{lstlisting}
+
+当然，它们也实现了 \lstinline!Printable! 和 \lstinline!Scannable! 类族。
+
+\begin{lstlisting}
+implement Printable Int8;
+implement Scannable Int8;
+\end{lstlisting}
+
+同时，这些类型也定义了从 \lstinline!Int! 隐式转换过来的函数，因此我们可以通过整数字面量来初始化一个 \lstinline!Int8! 类型的变量。
+
+\begin{lstlisting}
+export const of = (: Type ? Int8, x : Int) -> intrinsic;
+
+// main.asc
+const main = func () -> do {
+    auto x : Int8 = 42;
+};
+\end{lstlisting}
+
+
+
+\subsection{Proxy 类型}
+
+\lstinline!Prelude.Proxy! 辅助生成结构中的 \lstinline!@prop! 属性，因此所有需要使用该属性的库都需要导入这个组件。
+
+\begin{lstlisting}
+@ctor
+export const Proxy = struct (
+    target : ref infer T,
+    get : ref T -> ref infer U,
+    set : (ref T, U) -> ref U
+);
+\end{lstlisting}
+
+带有 \lstinline!@prop! 属性的成员会让编译器生成返回 \lstinline!Prelude.Proxy! 类型的代理对象，随后再根据重载的 \lstinline!<-! 运算符来控制访问行为：
+
+\begin{lstlisting}
+export const <- = (proxy : ref mut Proxy[infer T, infer U]) 
+    -> func (val : U) -> (proxy.set)(proxy.target, val);
+
+export const <- = (val : U) 
+    -> func (proxy : ref Proxy[infer T, infer U]) -> (proxy.get)(proxy.target);
+\end{lstlisting}
