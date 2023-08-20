@@ -1,0 +1,448 @@
+\begin{introduction}
+	\item 异常
+	\item \lstinline!catch! 子句
+	\item \lstinline!throw! 语句
+	\item 异常类型推断
+	\item 异常类型声明
+	\item \lstinline!exceptof! 函数
+	\item \lstinline!errorof! 函数
+	\item 单子
+	\item \lstinline!monad! 表达式
+	\item 单子异常
+	\item \lstinline!value! 和 \lstinline!error! 标注
+	\item 修饰性单子
+\end{introduction}
+
+\section{异常处理}
+
+\subsection{异常的抛出和捕获}
+
+AutoScript 中的异常处理是一个用于处理程序错误状态的机制。当程序遇到一个意料之外的状况时，可以通过 \lstinline!throw! 语句抛出一个异常。这个异常会顺着函数的调用链一层层回溯，直到跳出 \lstinline!main! 函数后终止程序。
+
+\begin{lstlisting}
+const main = funct () -> do {
+	const f = funct () -> throw 42;
+	f();					// f 抛出一个异常 42，随后其再次被 main 函数抛出，程序终止
+};
+\end{lstlisting}
+
+如果不希望异常继续回溯，可以在可能产生异常 \footnote{即异常类型为 \lstinline!Void! 的表达式。从设计上来说，AutoScript 的所有表达式均有值类型和异常类型，只不过它们可能分别甚至同时为空类型。}的表达式中使用 \lstinline!catch! 子句。
+
+\begin{grammar}[\texttt{catch} 子句] \label{grm:catch-clause}
+\begin{enumerate}
+	\item \lstinline!catch! \texttt{([id]) [funct-expr-list]}
+	\item \lstinline!catch! \texttt{[funct-expr-list]}
+	\item \lstinline!catch!
+\end{enumerate}
+\end{grammar}
+
+可以看到，\lstinline!catch! 子句和 \lstinline!match! 的语法高度相似。上面的第一种相当于为捕获的异常类型声明了一个变量，在捕获时会优先将异常对象初始化到这个变量上，随后再进行模式匹配；第二种则忽略了异常对象的整体值；第三种直接忽略所有捕获的异常。下面先展示一个最基本的捕获示例：
+
+\begin{lstlisting}
+const throwable = funct () -> do {
+	scan x : Int;
+	if (x == 0) {
+	    throw 42;
+	}
+	throw "abc";
+};
+
+const main = funct () -> do {
+	throwable() catch
+		Int i -> print "Zero",
+		otherwise -> print "Not zero";
+};
+\end{lstlisting}
+
+和 \lstinline!match! 表达式一样地，\lstinline!catch! 语句要求模式匹配中必须出现一个 \lstinline!otherwise! 模式，这是为了保证待匹配值一定会落入一种情况中。 \\
+
+一些情况下，我们可能希望将捕获的异常再次抛出。此时可以用上面第一种捕获语法并再次抛出，或使用上下文关键字 \lstinline!again!。
+
+\begin{lstlisting}
+const ErrorType = data (FatalError | NormalError);
+
+const f = funct () -> do {
+	scan x : Int;
+	if (x < 0) {
+		throw FatalError;
+	}
+	throw NormalError;
+};
+
+const main = funct () -> do {
+	f() catch
+		NormalError -> print "It's fine";
+		FatalError -> throw again;			// 再次抛出异常
+};
+\end{lstlisting}
+
+\lstinline!throw! 虽然是一个返回语句，但它和 \lstinline!return! 语句最大的不同在于它可以“穿透”途径的语句块。如果我们不为返回了异常对象的语句设置 \lstinline!catch! 子句，它会再次抛出这个异常。我们可以认为编译器会为所有异常类型为非空的表达式处生成下面的代码：
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const f = funct () -> do {
+    throw 42;
+};
+
+const main = funct () -> do {
+    f();								// 这个表达式的异常类型非空
+    f() catch otherwise -> ();			// 手动捕获后，编译器就不会自动生成代码了
+    
+    // 编译器会生成下面的代码
+    f() catch otherwise -> throw again;	// 如果没有异常处理则再次抛出
+};
+\end{lstlisting}
+\end{minipage}
+
+值得一提的是，\lstinline!catch! 虽然是一个子句关键字，但它可以通过符号 \lstinline|!!| 表示，它本身也可以组成一个表达式。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const f : Int -> Int;
+
+const main = funct () -> do {
+    print f() !! otherwise -> 42;		// 如果 f() 抛出异常，则输出 42
+};
+\end{lstlisting}
+\end{minipage}
+
+下一节我们会详细讨论和异常相关的类型信息。
+
+\subsection{异常类型推断}
+
+\lstinline!throw! 语句中，\lstinline!throw [expr]! 的部分是一个表达式，其本身类型为 \lstinline!Void!，并拥有异常类型 \lstinline!typeof([expr])!。编译器会通过这个类型来推导其实际“影响”的类型：
+
+\begin{itemize}
+	\item 如果 \lstinline!throw! 语句成功抛出当前最内侧的 \lstinline!do! 或 \lstinline!monad! 表达式，则其作为这个表达式的异常类型参考 \footnote{和 \lstinline!return! 语句不同地，一个 \lstinline!throw! 语句无法决定最终的异常类型，我们下面很快就会提到。}。
+	\item 如果 \lstinline!throw! 语句被某个语句中的 \lstinline!catch! 子句捕获，则会根据模式匹配决定 \lstinline!catch! 子句最终产生的类型 \footnote{经过 \lstinline!catch! 子句最终得到的表达式类型是它的值类型。某种角度来说，\lstinline!catch! 可以“洗白”有问题的异常语句。}。
+\end{itemize}
+
+作为异常类型参考的 \lstinline!throw! 语句会类似于声明了 \lstinline!choice! 的 \lstinline!do! 表达式中的 \lstinline!return! 语句，编译器会结合所有的 \lstinline!throw! 语句并将其选择类型作为异常类型。
+
+\begin{lstlisting}
+const f = funct () -> do {
+	scan x : Int;
+	if (x < 0) {
+		throw 42;		// 异常类型为 Int
+	}
+	else if (x > 0) {
+		throw "abc";	// 异常类型为 String
+	}
+	else {
+		throw True;		// 异常类型为 Bool
+	}
+};						// do 表达式的异常类型为 Int | String | Bool
+\end{lstlisting}
+
+除了参考 \lstinline!throw! 语句的异常类型，任何表达式的异常类型都会参与到编译器的判断中。比如内置的除法运算会产生 \lstinline!ZeroDivisor! 异常，因此包含除法的表达式拥有异常类型 \lstinline!ZeroDivisor!。
+
+\begin{lstlisting}
+const f = funct () -> do {
+	scan x : Int;
+	scan y : Int;
+	print x / y;		// 异常类型为 ZeroDivisor
+};						// 异常类型为 ZeroDivisor
+\end{lstlisting}
+
+当然，如果在可能产生异常的语句处使用 \lstinline!catch! 子句，且不再次抛出，则这个语句不参与编译器的异常类型推断（因为异常类型被 \lstinline!catch! 子句“洗白”了）。
+
+\begin{lstlisting}
+const f = funct () -> do {
+	scan x : Int;
+	scan y : Int;
+	print x / y catch;	// 异常类型为 Void
+};						// 异常类型为 Void
+\end{lstlisting}
+
+此前我们给出的例子都是 \lstinline!do! 表达式中出现的异常类型判断。但在 \lstinline!monad! 语句中其实会出现相同的效果，这里编译器并没有将表达式包装为声明的单子类型：
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () - > do {
+    print monad Option {
+    	throw 24;				// 直接抛出 24 而不是 Some 24
+    } catch otherwise -> 42;
+}:
+\end{lstlisting}
+\end{minipage}
+
+本质的原因是，单子本身就带有了异常类型的语义，因此不需要再次为异常对象包装。我们会在后面的小节中详细介绍。
+
+\subsection{函数的异常类型声明}
+
+异常类型声明是可选的，且出现在函数类型的最后，用关键字 \lstinline!except! 表示。
+
+\begin{grammar}[异常类型声明] \label{grm:exception-type-declaration}
+\begin{enumerate}
+	\item \lstinline!except! \texttt{[type-expr]}
+	\item \lstinline!except!
+\end{enumerate}
+\end{grammar}
+
+第一种是显示给出所有可能的抛出类型，第二种则仅声明函数会产生异常，并委托编译器通过函数定义来推断具体的异常类型。后者是更加常用的形式。函数异常声明中出现的类型应该是函数定义中异常类型的超集 \footnote{这实际上就是提前声明的兼容原则：定义处应是声明处的子类型。对于返回值拥有异常类型的函数，更少的异常可能是更多异常可能的子类型（好好思考这一点）。}。
+
+\begin{lstlisting}
+const f : Int -> Void except Int | String;
+const f = x -> throw 42;					// 没问题
+\end{lstlisting}
+
+为了得到表达式的异常类型，我们可以使用 \lstinline!exceptof! 关键字。这是一个\emph{静态}类型函数。如果想要动态获得异常类型，可以使用 \lstinline!errorof! 关键字。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const f = funct (b : Bool) -> do {
+    if (b) {
+        throw 42;
+    }
+    throw "abc";
+};
+
+const main = funct () -> do {
+    print exceptof(funct(True));		// 输出 Int | String
+    print errorof(funct(True));			// 输出 Int
+};
+\end{lstlisting}
+\end{minipage}
+
+其中的原理和 \lstinline!tagof! 类似，本质上就是取选择类型对象的标签。
+
+\section{单子}
+
+\subsection{单子的引入}
+
+AutoScript 中，\textbf{单子（Monad）}是对拥有特定特征的类型的称呼。这类类型\emph{一定}是一个选择类型（包括 ADT 类型），且其中包含一个\emph{值类型}和一系列\emph{空类型}；这里空类型也被称为\emph{异常类型} \footnote{注意到这里称谓和此前介绍的表达式类型雷同，这是因为所有 AutoScript 单子都可以兼容到表达式异常这个机制中，我们很快会介绍到这一点。}。首先让我们看看下面的一些例子：
+
+\begin{lstlisting}
+const make_option = funct (x : T) -> Some x;
+const make_list = funct (x : T) -> Vector[x];
+
+const main = func () -> do {
+    auto i = 42;
+    auto r = ref i;							// 创建对象
+    match (r)
+        ref x -> print x;					// 取出内部的对象
+        otherwise -> print "Null reference";// 空引用的情形
+
+	auto opt = make_option(42);				// 创建对象
+	match (opt)
+		Some x -> print x,					// 取出内部的对象
+		Null -> print "Null object";		// 空对象的情形
+	
+	auto list = make_list(42);				// 创建对象
+	match (list)
+	    x -> print x;						// 取出内部的对象（情形 1）
+	    ...xs -> print "Multiple elements"; // 取出内部的对象（情形 2）
+	    () -> print "Empty list";			// 空对象的情形
+};
+\end{lstlisting}
+
+在上面的例子中，我们对于引用类型、\lstinline!Option! 和 \lstinline!List! 展示了一些常见的使用代码。注释中已经给出了这些行为的总结：
+
+\begin{itemize}
+	\item 包装：这些类型需要一个包装函数。
+	\item 对包装对象执行操作：在对象非空的情况下，需要直接对其中的值进行操作。很多时候这会返回一个包装过的同类型对象，此时这个操作称为绑定：比如对一个包装过的对象 \lstinline!x! 依次执行 \lstinline!f!、\lstinline!g!，其中的每个函数都会解包对象并返回一个变换后对象的包装。理想情况下，我们可以借助这个操作简便地将 \lstinline!x! 依次传入 \lstinline!f! 和 \lstinline!g! 而无需手动解包两次。
+\end{itemize}
+
+AutoScript 中，利用 \lstinline!@monad! 属性为类型设定上面列出的两个操作的类型就是单子类型 \footnote{AutoScript 从未要求单子类型一定是一个选择类型，甚至 ADT 类型。}，但对于选择类型来说，其中第一个选择会被编译器当作值类型，而随后的所有标签都会被当作不同的异常类型；非选择类型会把其本身的类型当作值类型，而异常类型为 \lstinline!Void!。下面是一些例子：
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+@monad(make_option, option_bind)	// 为 monad 属性提供包装和绑定操作
+const Option = data (Some T | Null);
+
+const make_option = funct (x : T) -> Some x;
+
+const option_bind = funct (opt : Option[T]) 
+    -> funct (f : T -> Option[T]) -> match (opt)
+	    Some x -> f(x),
+	    Null -> Null;
+
+@monad(default, default)
+const SpecialMonad = data (A Int);	// 异常类型为 Void，相当于声明了 data (A Int | Void)
+
+@monad
+const AlsoMonad = Int;				// 值类型为 AlsoMonad，异常类型为 Void
+\end{lstlisting}
+\end{minipage}
+
+从这个角度来看，AutoScript 中的所有类型都可以当作单子。上面在 \lstinline!@monad! 属性中出现的是指定的单子包装函数和单子绑定函数，其签名是确定的因此不需要提前声明。如果将其中的参数设定为 \lstinline!default!（或当两个均为默认时可以直接省略 \lstinline!@monad! 属性的参数），则会通过下面的默认方式创建单子包装和单子绑定函数：
+
+\begin{lstlisting}
+@monad
+const SpecialMonad = data (A Int);
+@monad
+const TrivialMonad = Int;
+
+// 编译器会生成下面的代码
+const make_SpecialMonad = funct (x : Int) -> A x;
+const bind_SpecialMonad = funct (x : SpecialMonad) 
+    -> funct (f : Int -> SpecialMonad) -> match (x)
+        Int y -> f(y),
+        otherwise -> throw Unreachable;
+        
+const make_TrivialMonad = funct (x : Int) -> x;
+const bind_TrivialMonad = funct (x : TrivialMonad)
+    -> funct (f : Int -> TrivialMonad) -> match(x)
+        Int y -> f(y),
+        otherwise -> throw Unreachable;
+\end{lstlisting}
+
+后面的小节中我们将介绍如何使用单子类型。
+
+\subsection{monad 表达式}
+
+AutoScript 为了让上一节中提到的语法糖生效，特地设计了 \lstinline!monad! 表达式。在 \lstinline!monad! 表达式中，许多表达式的含义会发生变化。让我们以 \lstinline!monad Option! 为例：
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+	auto res = monad Option {	// 声明当前语句块为 Option 的单子块
+		scan x_input : Int;		// 读取一个 Int 类型的参数
+		auto x = x_input;		// 这里会将 x_input 的值自动装包为 Some x_input
+		if (x <= 0) {			// if 中的判断表达式会对 x 进行拆包，如果是 Null 则跳过
+			return 42;			// 返回的实际是 Option 42
+		}
+		x <- x + 1;				// 对 x 进行拆包且不为 Null 才进行操作。
+		return x;				// 若 x 为 Null 返回 Null，此外返回的实际是 Some x
+	};
+	print res;
+};
+\end{lstlisting}
+\end{minipage}
+
+
+上面，无论是在 \lstinline!x <= 0! 的判断处、\lstinline!x + 1! 的运算处，还是返回语句等位置，编译器都为这些操作添加了额外的拆包和装包操作。可以总结为：除了显式给出表达式类型的情形，编译器会为所有表达式中的变量尝试装包和绑定。我们实际上可以写出下面的等价代码：
+
+\begin{lstlisting}
+const main = funct () -> do {
+	auto res = do {
+	    scan x_input : Int;
+	    auto x = make_option(x_input);
+	    if (option_bind(x) (<= 0)) {
+	        return make_option(42);
+	    }
+	    x <- make_option(option_bind(x) (+ 1));
+		return make_option(x);
+	};
+	print res;
+};
+\end{lstlisting}
+
+\lstinline!monad! 表达式中虽然允许出现多种单子类型，但其返回类型必须是唯一可以确定的，这点和 \lstinline!do! 表达式没有不同。
+
+\begin{lstlisting}
+const main = funct () -> do {
+	auto res = monad Option {
+		scan b : Bool;
+		if (b) {
+			return 42;		// 编译器推断 monad 表达式返回类型为 Option[Int]
+		}
+		return "abc";		// 编译错误，表达式类型前后判断矛盾
+	};
+};
+\end{lstlisting}
+
+有时，我们并不需要编译器自动将表达式包装为单子类型，此时可以使用表达式修饰符 \lstinline!fixed! 来令某一层表达式不受单子包装影响。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+	auto res = monad Option {
+		auto x = fixed 0;		// 0 不会被自动装包为 Some 0
+		if (x <= 0) {			// 若 x 不是单子类型，这里不会自动拆包
+			x <- fixed 42;		// 由于左侧是 Int 类型，右侧不需要包装为 Some 42
+		}
+		return x;
+	};
+};
+\end{lstlisting}
+\end{minipage}
+
+\lstinline!fixed! 只能作用于一次表达式求值。如果需要嵌套的多个表达式都不受单子装箱影响，可以直接使用 \lstinline!do! 表达式。
+
+\begin{lstlisting}
+const main = funct () -> do {
+	auto res = monad Option {
+		scan x : Int;
+		if (fixed x <= 0) {
+			x <- fixed do { return x * x + 1; };	// 等效于 fixed (fixed x * x) + 1
+		}
+		return fixed x;								// 这里会返回一个 Int 而非 Option[Int]
+	};
+};
+\end{lstlisting}
+
+从上面的例子更加可以看出 \lstinline!monad! 表达式只是 \lstinline!do! 表达式建立在 \lstinline!@monad! 类型上的语法糖；我们完全可以让 \lstinline!monad! 表达式中不出现任何单子类型。 \\
+
+嵌套的多个 \lstinline!monad! 和 \lstinline!do! 语句相互独立，不会受到单子声明影响，这也是为什么上面的代码中 \lstinline!do! 的语句块屏蔽了外层语句块的装箱操作。不过，\lstinline!do! 表达式本身是一个表达式，因此它的返回值会被装箱为 \lstinline!Option! 类型，因此上例中我在最外层使用了 \lstinline!fixed! 修饰符。
+
+
+\subsection{单子异常}
+
+由于单子类型自带“异常类型”，AutoScript 提供了将单子对象作为异常类型抛出的方式。我们需要在返回语句中使用 \lstinline!value! 或 \lstinline!error! 关键字。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const throw_option = funct () -> monad Option {
+    scan b : Bool;
+    if (b) {
+        return value 42;
+    }
+    return error Null;
+};
+
+const main = funct () -> do {
+    print typeof(throw_option);		// 输出 () -> Int
+    print exceptof(throw_option());	// 输出 Null
+};
+\end{lstlisting}
+\end{minipage}
+
+可以看到，这两个关键字为函数添加了一个异常类型，也即其空类型。\lstinline!value! 并不意味着编译器会直接将其后的表达式作为函数的返回类型：它依然会当场构建一个 \lstinline!Some 42! 对象，随后会根据 \lstinline!(Some 42).value()! 得到其中包含的值类型。\lstinline!error! 后面的对象也是根绝 \lstinline!Null.error()! 推断得到其类型的。 \\
+
+经过这样调整的函数会和使用了抛出语句的函数行为非常相似：编译器会将 \lstinline!return error! 语句修改成 \lstinline!throw! 语句，因此（正如在上一节中介绍的），所有调用该函数的地方都会添加一个默认捕获并再次抛出的 \lstinline!catch! 子句。相应地，我们可以手动添加 \lstinline!catch! 子句来捕获这些函数的异常。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const f = funct () -> monad Option {
+    scan b : Bool;
+    if (b) {
+        return value 24;
+    }
+    return error Null;
+};
+
+const main = funct () -> do {
+    f() catch
+        Some i -> print "value = $(i)",
+        Null -> print "Nothing is there.";
+};
+\end{lstlisting}
+\end{minipage}
+
+
+\subsection{修饰性单子（实验性）}
+
+在前面的小节中，我们在介绍单子的性质时曾经将引用类型作为例子。实际上，所有类型都可以看作单子——从修饰符的角度来看。我们可以轻松地定义出它们的包装和绑定函数，以引用类型为例：
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const make_ref = funct $x -> ref x;
+const bind_ref = funct ($r : ref T) -> funct ($f : T -> ref T) -> match (r)
+    ref x -> ref f(x),
+    otherwise -> r;
+\end{lstlisting}
+\end{minipage}
+
+这里出现的 \texttt{\$} 是一个别名声明，其中的参数会以内联的方式在编译期展开，因此作为参数的 \lstinline!x! 不会在传递时被复制出来。具体内容详见别名和宏的章节。
+
