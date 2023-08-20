@@ -1,7 +1,13 @@
 \begin{introduction}
+	\item ADT 表达式
+	\item 标签
     \item 模式声明
-    \item 值约束
-    \item 类型约束
+    \item 原子模式
+    \item 元组模式
+    \item 修饰模式
+    \item 选择模式
+    \item 约束声明
+    \item 约束的合取与析取
 \end{introduction}
 
 \section{抽象数据类型}
@@ -23,11 +29,12 @@ AutoScript 中用 \textbf{抽象数据类型（Abstract Data Type, ADT）} 来�
 \end{enumerate}
 \end{grammar}
 
-其中第二种是不带任何参数的标签。相邻的标签用 \lstinline!|! 运算符相隔，这和选择类型的语法相似（实际上两者的本质也是相同的）。下面是两个例子：
+其中第二种是不带任何参数的标签，可以理解为带一个 \lstinline!Void! 参数的标签。相邻的标签用 \lstinline!|! 运算符相隔，这和选择类型的语法相似（实际上两者的本质也是相同的）。下面是几个例子：
 
 \begin{lstlisting}
 const Bool = data (True | False);
 const MaybeInt = data (Value Int | Null);
+const Color = data (RGB (r ?? 0.0 : Real, g ?? 0.0 : Real, b ?? 0.0 : Real) | NoColor);
 
 const main = func () -> do {
 	auto b = True;
@@ -37,10 +44,14 @@ const main = func () -> do {
 	auto i = Value 42;
 	print typeof(i);		// 输出 MaybeInt
 	print tagof(i);			// 输出 Value
+	
+	auto c = RGB [r = 0.4, b = 0.6];
+    print typeof(c);		// 输出 Color
+    print tagof(c);			// 输出 RGB
 };
 \end{lstlisting}
 
-和结构表达式类似地，上面的圆括号并非必须，但为了避免运算符优先级造成的混乱，我们习惯上使用圆括号。
+可以看到，ADT 是一个选择类型和结构类型的组合体：每个标签都可以声明为一个结构类型，然后 ADT 是至少两个标签组成的选择类型。和结构表达式类似地，上面的圆括号并非必须，但为了避免运算符优先级造成的混乱，我们习惯上使用圆括号。
 
 \subsection{标签的本质}
 
@@ -58,12 +69,14 @@ const Value = struct (
 const Null = struct ();
 \end{lstlisting}
 
+这里的 \lstinline!@eager! 属性可以让函数会自动被调用，其要求函数接收 \lstinline!Void! 为参数。 \\
+
 因此 ADT 是一系列结构对象组成的选择类型，后者的很多性质同样适用于 ADT，比如强制类型转换。上面使用的 \lstinline!@ctor! 带了一个参数，它相当于指定了构造函数生成对象的类型（不是默认的 \lstinline!Value! 而是指定的 \lstinline!MaybeInt!），这也是为什么我们直接通过 \lstinline!Value 42! 就可以构建一个 \lstinline!MaybeInt! 对象。
 
 \begin{lstlisting}
 const MaybeInt = data (Value Int | Null);
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto i = Value 42;
 	print i as Value;		// 输出 Value 42
 };
@@ -74,7 +87,7 @@ const main = func () -> do {
 \begin{lstlisting}
 const MaybeInt = data (Value Int | Null);
 
-const f = func (x : MaybeInt) -> do {
+const f = funct (x : MaybeInt) -> do {
 	if (tagof(x) == Value) {
 		print "Value is $(x as Value)";
 	}
@@ -84,7 +97,7 @@ const f = func (x : MaybeInt) -> do {
 };
 \end{lstlisting}
 
-不过这样的可读性比较差。下一节让我们介绍 ADT 在模式匹配中的应用。
+不过这样的可读性比较差。我们通常会使用模式匹配对 ADT 类型对象进行操作。
 
 \subsection{选择类型的模式匹配}
 
@@ -93,7 +106,7 @@ const f = func (x : MaybeInt) -> do {
 \begin{lstlisting}
 const MaybeInt = data (Value Int | Null);
 
-const f = func (x : MaybeInt) -> do {
+const f = funct (x : MaybeInt) -> do {
 	match (x)
 		Value i -> print "Value is $(i)",
 		Null -> print "Nothing";
@@ -102,10 +115,10 @@ const f = func (x : MaybeInt) -> do {
 
 上面我们用 \lstinline!Value x! 来匹配 \lstinline!MaybeInt! 作为 \lstinline!Value! 时的结构，并声明了一个变量 \lstinline!i! 绑定其中存的值。特别地，\lstinline!Null! 后面不加任何变量。 \\
 
-这个语法可以自然地使用在普通的选择类型上。
+这种语法可以直接用于普通的选择类型，这是因为选择类型中的标签正是其自身（以 \lstinline!Int | String! 为例，其类似于一个 \lstinline!data (Int Int | String String)!。
 
 \begin{lstlisting}
-const f = func (x : Int | String) -> do {
+const f = funct (x : Int | String) -> do {
 	match (x)
 		Int i -> print "An integer $(i)",
 		String s -> print "A string $(s)";
@@ -115,7 +128,7 @@ const f = func (x : Int | String) -> do {
 配合上一章介绍的 \lstinline!guard! 表达式，我们可以简洁地操纵选择类型对象。
 
 \begin{lstlisting}
-const f = func (x : Int | String) -> do {
+const f = funct (x : Int | String) -> do {
 	x <| (guard
 		Int i -> print "An integer $(i)",
 		String s -> print "A string $(s)");
@@ -151,17 +164,17 @@ AutoScript 中的模式中，存在三种不同作用的结构，其一是用于
     \item \texttt{()}
     \item \texttt{[constr] [default-decl]}
     \item \texttt{[storage-spec] [id] [default-decl]}
-    \item \texttt{[storage-spec] [id] [constr] [default-decl]}
-    \item \texttt{[storage-spec] [id] [type-decl] [default-decl]}
-    \item \texttt{[storage-spec] [id] [type-decl] [constr] [default-decl]}
+    \item \texttt{[storage-spec] [id] [default-decl] [constr]}
+    \item \texttt{[storage-spec] [id] [default-decl] [type-decl]}
+    \item \texttt{[storage-spec] [id] [default-decl] [type-decl] [constr]}
 \end{enumerate}
 \end{grammar}
 
 其中 \lstinline![constr]! 指的是模式中的约束，让我们在下一节中再详细介绍。下面是对这些语法的逐个说明：
 
 \begin{enumerate}
-    \item 跳过类型推断 \footnote{包括 \lstinline!undefined! 的情形，因此 \lstinline!otherwise! 会造成函数是不严格的。\textbf{严格函数（Strict Function）}要求 \lstinline!undefined! 输入一定会导致 \lstinline!undefined! 输出。考虑 \lstinline!\otherwise -> 42!，这显然不是一个严格函数。}，可以匹配任何实体，但此时不声明任何变量。
-    \item 匹配空对象 \lstinline!()!，此时不能声明任何变量 \footnote{敏锐的读者可能发现了这里的不和谐之处：\lstinline!()! 是一个对象，但为什么只有它被单独列出来？其它的譬如 \lstinline!42! 不能直接出现么？实际上，它们可以以约束的形式出现，比如 \lstinline!? 42!，而 \lstinline!()! 的特殊性是为了语言简洁性妥协的：我们避免类似于 \lstinline!\\\?() -> ...! 的函数出现。}。
+    \item 跳过类型推断 \footnote{包括 \lstinline!undefined! 的情形，因此 \lstinline!otherwise! 会造成函数是不严格的。\textbf{严格函数（Strict Function）}要求 \lstinline!undefined! 输入一定会导致 \lstinline!undefined! 输出。考虑 \lstinline!\otherwise -> 42!，这显然不是一个严格函数。这个特点和 Haskell 完全一样。不过我们可以类似地使用不加约束的原子模式，如 \lstinline!x! 来强制求值。}，可以匹配任何实体，但此时不声明任何变量。
+    \item 匹配空对象 \lstinline!()!，此时不能声明任何变量 \footnote{敏锐的读者可能发现了这里的不和谐之处：\lstinline!()! 是一个对象，但为什么只有它被单独列出来？其它的譬如 \lstinline!42! 不能直接出现么？实际上，它们可以以约束的形式出现，比如 \lstinline!? 42!，而 \lstinline!()! 的特殊性是为了语言简洁性妥协的：我们避免类似于 \lstinline!\?() -> ...! 的函数出现。}。
     \item 一个约束，不声明任何变量。
     \item 无约束的自动类型推断，可以匹配任何实体并声明一个变量。
     \item 带有约束的自动类型推断，会将待匹配的实体传给约束判断其返回结果是否为真，若是则声明一个变量。
@@ -172,11 +185,26 @@ AutoScript 中的模式中，存在三种不同作用的结构，其一是用于
 原子模式是最常见的模式声明，其主要出现在变量的声明语句和函数的参数类型声明 \footnote{实际上，变量的提前声明对应了第 6 种情形，这也是唯一允许的提前声明语法。}。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     auto x = 42;                    // 原子模式 auto x
-    auto f = func (x : Int) -> x;   // 原子模式 auto f 和 x : Int
+    auto f = funct (x : Int) -> x;   // 原子模式 auto f 和 x : Int
 };
 \end{lstlisting}
+
+原子模式中最为特殊的是 \lstinline!otherwise! 这个占位符字面量。从其性质来看，它是一个极强的“混子”，所有和它相关的判断都会返回真。让我们尝试在其它地方使用 \lstinline!otherwise!。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+    auto x : Int = otherwise;		// 编译错误，otherwise 不能作为常规表达式求值
+    auto otherwise = 42;			// 无事发生，没有真的 otherwise 作为变量被声明
+    print otherwise;				// 编译错误，otherwise 不能作为常规表达式求值
+};
+\end{lstlisting}
+\end{minipage}
+
+从上面的例子可以看出， \lstinline!otherwise! 仅仅是模式声明中一个特殊的标识符，代表一个默认的匹配情形 \footnote{可以类比 C++26 中的占位符 \texttt{\_}。}。
 
 
 \subsection{元组模式}
@@ -193,12 +221,12 @@ const main = func () -> do {
 这里 \lstinline![pattern-list]! 指的是由逗号分隔的多个 \lstinline![pattern]!。
 
 \begin{enumerate}
-    \item 完全匹配的元组模式，将元组中每个元素都（整体）匹配出来。
-    \item 模糊匹配的元组模式，将元组匹配为一个\textbf{包（Pack）}。包中声明的所有变量都将带有\emph{可展开性}，只需利用运算符 \lstinline!...! 即可将其展开为一个元组。
+    \item 完全匹配的元组模式，将元组中特定元素一对一匹配出来。
+    \item 模糊匹配的元组模式，将元组匹配为一个\textbf{包（Pack）}。包中声明的所有变量都将带有\emph{可展开性}，只需利用包展开 运算符 \lstinline!...! 即可将其展开为一个元组。
 \end{enumerate}
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     auto (x, ...xs) = (1, 2, 3);    // 元组模式 (x, ...xs)，其中包含了另一个元组模式 ...xs
     auto ...ys = ...xs;             // 元组模式 ...ys，右侧通过 ... 运算符将包展开为元组
     print ...ys;                    // 输出 2, 3
@@ -208,7 +236,7 @@ const main = func () -> do {
 我们有必要详述包的特性。首先，包的类型并不是一个元组，而是一个定义为内部实现的库类型 \lstinline!Prelude.Pack!。如上面所示，可以通过 \lstinline!...! 运算符将一个包转换为一个元组。不仅如此，对包进行的任何其它运算都会被视为对包中每个实体的运算。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto tup = (1, 2, 3);
 	auto ...xs = mut tup;
 	xs <- xs - 2;				// 对包中每个元素 x 都进行 x <- x - 2
@@ -226,7 +254,7 @@ const main = func () -> do {
 通过这种方式，我们可以轻松地求出一个数组中元素的和：
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto arr = (1, 2, 3);
 	print (arr + ...);		// 输出 6
 };
@@ -235,7 +263,7 @@ const main = func () -> do {
 或者依次处理一个包中的元素：
 
 \begin{lstlisting}
-const print_all = func (...args) -> do {
+const print_all = funct (...args) -> do {
 	auto f = guard
 		(x : Int) -> "This is an integer",
 		(x : Real) -> "This is a real number",
@@ -261,13 +289,13 @@ const print_all = func (...args) -> do {
 \end{grammar}
 
 \begin{enumerate}
-    \item 匹配一个原子实体，将其值（无原子性）复制出来并通过 \lstinline![pattern]! 匹配。
-    \item 匹配一个动态实体，将其值（无动态性）复制出来并通过 \lstinline![pattern]! 匹配。注意这里因为没有给出具体的实例类型，所以 \lstinline![pattern]! 可能被多种实例类型匹配。
-    \item 匹配一个可变实体，将其值（无可变性）复制出来并通过 \lstinline![pattern]! 匹配。
-    \item 匹配一个引用实体，将其引用目标复制出来并通过 \lstinline![pattern]! 匹配。
+    \item 匹配一个原子实体，将其原型以别名方式取出来并通过 \lstinline![pattern]! 匹配。
+    \item 匹配一个动态实体，将其原型以别名方式取出并通过 \lstinline![pattern]! 匹配。注意这里因为没有给出具体的实例类型，所以 \lstinline![pattern]! 可能被多种实例类型匹配。
+    \item 匹配一个可变实体，将其原型以别名方式取出来并通过 \lstinline![pattern]! 匹配。
+    \item 匹配一个引用实体，将其引用目标以别名方式取出并通过 \lstinline![pattern]! 匹配。
 \end{enumerate}
 
-修饰模式声明出来的模式会失去被匹配实体的一些性质，不过可以在 \lstinline![pattern]! 的最前面加上一个总体声明：
+模式到子模式的过程总是以别名方式构建的，这可以保证模式匹配中最多生成一个新的对象，避免内存的浪费。如果依然需要将父模式声明为变量，可以在 \lstinline![pattern]! 的最前面加上一个整体声明：
 
 \begin{grammar}[整体声明 \texttt{[total-decl]}] \label{grm:total-declaration}
     \lstinline![id]~[pattern]!
@@ -276,7 +304,7 @@ const print_all = func (...args) -> do {
 下面是一些例子：
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     auto x = mut 42;
     auto y~(mut n) = x;     // 修饰模式 mut n，并使用了整体声明 y
     print typeof(y);        // 输出 mut Int
@@ -284,7 +312,46 @@ const main = func () -> do {
 };
 \end{lstlisting}
 
-总体声明出来的变量和它进一步匹配的模式声明之间没有引用关系，比如上面的例子中，如果我们修改了 \lstinline!y! 的值，并不会影响 \lstinline!n! 的内容，因为它们是两份拷贝。
+总体声明出来的变量和它进一步匹配的模式声明之间是别名的关系，比如上面的例子中，如果我们修改了 \lstinline!y! 的值，会影响 \lstinline!n! 的内容。不过不要因此弄混了模式声明和待匹配对象之间的关系：等号左边是右侧的复制，因此虽然
+
+\subsection{可选修饰模式}
+
+上节介绍的修饰模式有一个变种，即可选修饰模式，它使用 \lstinline!atom?!、\lstinline!dyn?!、\lstinline!mut?! 和 \lstinline!ref?! 来选择匹配一个可能出现的修饰符。
+
+\begin{grammar}[可选修饰模式 \texttt{optional-qualifier-pattern}] \label{grm:optional-qualifier-pattern}
+\begin{enumerate}
+	\item \lstinline!atom? [pattern]!
+	\item \lstinline!dyn? [pattern]!
+	\item \lstinline!mut? [pattern]!
+	\item \lstinline!ref? [pattern]!
+\end{enumerate}
+\end{grammar}
+
+这种模式可以灵活地匹配任何表达式，且去除这个修饰符。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+    auto x = 42;
+    auto y = mut 42;
+    auto mut? z = x;
+    auto mut? w = y;
+};
+\end{lstlisting}
+\end{minipage}
+
+这种模式和使用 \lstinline!demut! 等函数相比，更加偏向声明式；如果有命令式的代码习惯，使用 \lstinline!demut! 也无妨。下面是一个对比：
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const f = funct (input : mut? Int) -> do {
+    auto mut? x = input;
+    auto y = demut input;
+};
+\end{lstlisting}
+\end{minipage}
 
 \subsection{选择模式}
 
@@ -302,14 +369,18 @@ const main = func () -> do {
     \item 对应了无参数的标签。需要注意这和 \lstinline![tag-id] ()! 是不同的：尽管它们都匹配了内存布局为 \lstinline!()! 的标签类型，但前者对应了拥有 \lstinline!@eager! 属性的构造函数，后者则没有该属性。
 \end{enumerate}
 
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     scan x : Option[Int];
     match (x)
         Some e -> print e           // 选择模式 Some e
         Null -> print "Nothing";    // 选择模式 Null
 };
 \end{lstlisting}
+\end{minipage}
+
 
 \section{约束}
 
@@ -321,17 +392,16 @@ const main = func () -> do {
 \begin{enumerate}
     \item \lstinline!? [pred]!
     \item \lstinline!:? [pred]!
-    \item \lstinline!? [pred] :? [pred]!
 \end{enumerate}
 \end{grammar}
 
 上面的 \lstinline!?! 称为值约束提示符，\lstinline!:?! 称为类型约束提示符。约束在变量声明处可能产生错误：如果类型约束不被满足会产生编译期错误；值约束不被满足则是运行期异常。在函数参数中出现的约束则作为重载决议判断的标准，编译器会按照顺序依次判断是否满足所有模式和约束。
 
 \begin{lstlisting}
-const not_zero = func (x : Int) -> x <> 0;
-const not_int = func (const T : Type) -> T <> Int;
+const not_zero = funct (x : Int) -> x <> 0;
+const not_int = funct (const T : Type) -> T <> Int;
 
-const main = func () -> do {
+const main = funct () -> do {
     auto x ? not_zero = 42;     // 运行期检查其是否大于零
     auto y :? not_int = 42;     // 编译期错误
 };
@@ -340,7 +410,7 @@ const main = func () -> do {
 类型约束不仅仅可以用常规的类型谓词，也可以使用类型、类族、模版 \footnote{有关类族和模版的内容我们会在高级知识的部分介绍。}。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     scan x : Option[Int];
     match (x)
         :? Int -> print "Just an integer"
@@ -371,9 +441,9 @@ const main = func () -> do {
 约束的合取与析取操作是借助查询结构完成的。我们已经在第六章中见到了查询结构对结构类型对象的筛选功能。这个功能当然也可以延续到模式匹配的约束中。
 
 \begin{lstlisting}
-const main = func () -> do {
-	const gt = func (x : Int) -> func (y : Int) -> y > x;
-	const lt = func (x : Int) -> func (y : Int) -> y < x;
+const main = funct () -> do {
+	const gt = funct (x : Int) -> funct (y : Int) -> y > x;
+	const lt = funct (x : Int) -> funct (y : Int) -> y < x;
 	
 	scan x : Int;
 	match (x)
@@ -388,32 +458,49 @@ const main = func () -> do {
 \begin{lstlisting}
 import Math;
 
-const main = func () -> do {
-	const gt = func (x : Int) -> func (y : Int) -> y > x;
-	const lt = func (x : Int) -> func (y : Int) -> y < x;
-	const sq = func (x : Int) -> do {
+const main = funct () -> do {
+	const gt = funct (x : Int) -> funct (y : Int) -> y > x;
+	const lt = funct (x : Int) -> funct (y : Int) -> y < x;
+	const sq = funct (x : Int) -> do {
 		return x == Math.floor(Math.sqrt(x)) as Int;
 	};
 
 	scan x : Int;
 	match (x)
 		[? gt(42), [? sq][? lt(42)]] -> "Greater than 42 or is perfect square less than 42",
-		[? sq][? lt(42), ?gt(42)] -> "Perfect square not equal to 42",
+		[? sq][? lt(42), ? gt(42)] -> "Perfect square not equal to 42",
 		otherwise -> "Other matchs";
 };
 \end{lstlisting}
 
-此外，回忆函数之间可以进行运算，\lstinline!f @ g! 相当于 \lstinline!func (...args) -> f(...args) @ g(...args)!。因此，我们可以用 \lstinline!and! 和 \lstinline!or! 来连接多个约束。
+此外，回忆函数之间可以进行运算，\lstinline!f @ g! 相当于 \lstinline!funct (...args) -> f(...args) @ g(...args)!。因此，我们可以用 \lstinline!and! 和 \lstinline!or! 来连接多个约束。
 
 \begin{lstlisting}
-const not_zero = func (x : Int) -> x <> 0;
-const is_even = func (x : Int) -> x `mod` 2 == 0;
+const not_zero = funct (x : Int) -> x <> 0;
+const is_even = funct (x : Int) -> x `mod` 2 == 0;
 
-const main = func () -> do {
+const main = funct () -> do {
     auto x ? not_zero and is_even = 42;
 };
 \end{lstlisting}
 
 
-\subsection{多参数谓词}
+\subsection{动态约束类型}
+
+从约束出发，我们可以设计一些拥有动态约束的类型。可以在结构类型声明或其构造函数中设置值约束。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const not_zero = funct (x : Int) -> x <> 0;
+const Point = struct (
+    x : Real ? not_zero,
+    y : Real ? not_zero
+);
+
+const main = funct () -> do {
+    auto p : Point = (1.0, 0.0);	// 运行错误，约束未满足
+};
+\end{lstlisting}
+\end{minipage}
 

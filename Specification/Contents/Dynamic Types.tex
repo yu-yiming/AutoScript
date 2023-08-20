@@ -6,10 +6,10 @@
 
 \subsection{对象头}
 
-我们可以用 \lstinline!dyn! 修饰符来声明一个\textbf{动态类型（Dynamic Type）}，与之对应的是不加 \lstinline!dyn! 的\textbf{原始类型（Prototype）}，这些类型除了最基本的编译器类型信息外，还会使用\emph{对象头}用于存储运行期的类型信息，这部分可以通过 \lstinline!Prelude.Head! 来表示。因此本质上动态类型是一个延展类型。拥有动态类型的对象也被称为\textbf{动态对象（Dynamic Object）}。
+我们可以用 \lstinline!dyn! 修饰符来声明一个\textbf{动态类型（Dynamic Type）}，与之对应的是不加 \lstinline!dyn! 的\textbf{原始类型（Prototype）}，这些类型除了最基本的编译器类型信息外，还会使用\emph{对象头}用于存储运行期的类型信息，这部分可以通过 \lstinline!Prelude.Head! 来表示。因此本质上动态类型 \lstinline!dyn T! 是一个元组类型 \lstinline!(Head, T)!。拥有动态类型的对象也被称为\textbf{动态对象（Dynamic Object）}。
 
 \begin{lstlisting}
-const DynInt = dyn Int;		// dyn Int 相当于 Int & Prelude.Head
+const DynInt = dyn Int;		// dyn Int 相当于 (Head, Int)
 \end{lstlisting}
 
 对象头中包含了一个类型信息的引用和一个动态存储空间的引用，因此它的大小是 16。
@@ -21,16 +21,16 @@ const Head = struct (
 );
 \end{lstlisting}
 
-上面，我们用 \lstinline!ref Void! 来表示一段内存的引用 \footnote{这类似于 C 的 \lstinline!void*!。}；默认情况下，这段内存的大小为零。
+上面，我们用 \lstinline!ref Void! 来表示一段内存的引用 \footnote{这类似于 C 的 \lstinline!void*!。}；默认情况下，这段内存的大小为零，且存储一个空对象。
 
 \begin{lstlisting}
 const main = func () -> do {
 	auto x = dyn 42;
-	print (x as Head).data;		// 输出 ()
+	print rtti::head(x).data;		// 输出 ()
 };
 \end{lstlisting}
 
-我们可以用 \lstinline!new! 限定符来为动态对象添加信息。这些新建的变量会和在这个对象的动态存储空间中构建的对象绑定。
+这里的 \lstinline!rtti::head! 是一个定义在模块 \lstinline!Meta! 中的函数，用于获得对象头。我们可以用 \lstinline!new! 限定符来为动态对象添加信息。这些新建的变量会和在这个对象的动态存储空间中构建的对象绑定。
 
 \begin{lstlisting}
 const main = func () -> do {
@@ -40,22 +40,36 @@ const main = func () -> do {
 };
 \end{lstlisting}
 
-和通常情况下点调用含义一致地，这里的 \lstinline!x.message! 也应该理解为 \lstinline!(Int & Prelude.Head)::message! 对 \lstinline!x! 的调用。只不过它有两个主要的差别：
+不过，这段代码中 \lstinline!x.message! 不能简单理解成 \lstinline!x! 所在名字空间中 \lstinline!message! 函数对 \lstinline!x! 的调用，因为这并不合理：我们从来没有声明过 \lstinline!message! 函数，同时它也没有一个编译期确定的返回类型。试考虑调用表达式 \lstinline!message(x)!，我们对这里 \lstinline!message! 的类型一无所知。 \\
 
-\begin{itemize}
-	\item 其一，\lstinline!message! 只对 \lstinline!x! 能够调用成功。实际上它的实现中会存储一个静态查询表，并根据变量的名字来返回对应的值。
-	\item 其二，\lstinline!new x.message! 并不是一个合法的函数声明语句；我们相当于用声明变量的方法来声明了一个函数，这在静态对象上是不可能的。
-\end{itemize}
+这便设计到点调用表达式的另一层含义。若符号 \lstinline!.! 的左侧拥有动态类型，编译器会在无法找到其命名空间中相应函数后选择从一个动态的词典中查找这个属性。若不存在则新建一个属性。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+    auto x = dyn 42;
+    new x.field = "abc";
+    
+    // 编译器会生成下面的代码：
+    try x.field = "abc"
+    else {
+        sys::alloc(ref rtti::head(x).data, "abc");
+    }
+};
+\end{lstlisting}
+\end{minipage}
+
+这里调用了一个内部函数 \lstinline!sys::alloc!，其用于为一个对象分配内存空间，并视情况更新内存地址 \footnote{类似于 C 语言中的 \lstinline!realloc! 函数。}。 \\
 
 注意，我们不能在对象上声明一个和其原有成员同名的动态成员。这也保证了动态类型不会丢失其原始类型的性质。
-
 
 \subsection{动态类型和原始类型的转换}
 
 动态类型对象可以轻松地转换为原始类型，因为它们拥有完全相同的内存布局前缀。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto x = dyn 42;
 	auto y : Int = x;			// 没问题
 };
@@ -64,9 +78,9 @@ const main = func () -> do {
 甚至它们的引用类型也是兼容的：
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto x = dyn 42;
-	const f = func (input : ref Int) -> print input;
+	const f = funct (input : ref Int) -> print input;
 	
 	f(x);						// 没问题
 };
@@ -82,7 +96,7 @@ const main = func () -> do {
 本节中让我们介绍 AutoScript 中的\textbf{运行期类型信息（RunTime Type Information, RTTI）}。首先，由于所有类型可以是一个变量，因此我们完全可以根据它的信息（存储在 \lstinline!Type! 类型的对象上）在运行时获取它的信息。这些信息包括了内存布局、可变性、原子性、动态性等。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto mut_int = mut Int;
 	print mut_int.name();		// 输出 mut Int
 	print mut_int.is_mut();		// 输出 True
@@ -93,7 +107,7 @@ const main = func () -> do {
 上面的例子中我们用到了此前从未尝试过的形式：将类型声明为自动存储期的变量；这当然没有任何问题，因为 \lstinline!Type! 作为一个内置类型可以声明任何存储期的变量。不过，这样的变量不能用作类型标注。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto int = Int;
 	auto x : int = 42;			// 编译错误：int 不是一个编译期常量
 };
@@ -106,7 +120,7 @@ const main = func () -> do {
 \emph{类族}也拥有自己的类型，\lstinline!Class!。我们可以类似上一节将类族存储在一个变量中。类似于显式类型声明，类族提示符也只适用于编译期，因此这样得到的类族对象只能用于 RTTI。\lstinline!Class! 中可以访问所有实现了该类族的类型（由于动态类型的存在，这个函数不是纯的）。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto addable = class {
 		x : T,
 		y : T,
@@ -128,11 +142,11 @@ const main = func () -> do {
 AutoScript 的对象头中存储了和继承相关的信息，因此我们可以利用动态类型实现子类型多态。
 
 \begin{lstlisting}
-const polyprint = func (x : dyn Int) -> print x.to_string();
+const polyprint = funct (x : dyn Int) -> print x.to_string();
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto x = dyn 42;
 	auto y = dyn 42;
-	new y.to_string = func () -> y * 2;
+	new y.to_string = funct () -> y * 2;
 };
 \end{lstlisting}

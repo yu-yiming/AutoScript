@@ -52,10 +52,10 @@ auto arr : Array(Int, 3);		// 声明了一个（C++ 中的） int[3] 类型
 AutoScript 中的函数和 C++ 略有不同，偏要说的话它更类似于 C++ 中的闭包。函数可以通过函数表达式（对应 C++ 中的 lambda 表达式）定义：
 
 \begin{lstlisting}
-const id = func (x : Int) -> x;
+const id = funct (x : Int) -> x;
 \end{lstlisting}
 
-我们通常需要用到 \lstinline!func! 关键字来提示编译器接下来是一个函数表达式。函数表达式中，包含了参数声明和一个函数体。和 C++ 不同的是，AutoScript 中的函数体是一个表达式。这样的设计让函数和它的类型一一对应：上面的例子中，函数的类型是 \lstinline!Int -> Int!，正好是左侧传入一个 \lstinline!Int! 参数，右侧返回一个 \lstinline!Int! 类型对象。得益于强大的类型推断系统，函数的返回类型也不需要显式给出，这和 C++ 中返回类型使用 \lstinline!auto! 占用符的函数是一样的。
+我们通常需要用到 \lstinline!funct! 关键字来提示编译器接下来是一个函数表达式。函数表达式中，包含了参数声明和一个函数体。和 C++ 不同的是，AutoScript 中的函数体是一个表达式。这样的设计让函数和它的类型一一对应：上面的例子中，函数的类型是 \lstinline!Int -> Int!，正好是左侧传入一个 \lstinline!Int! 参数，右侧返回一个 \lstinline!Int! 类型对象。得益于强大的类型推断系统，函数的返回类型也不需要显式给出，这和 C++ 中返回类型使用 \lstinline!auto! 占用符的函数是一样的。
 
 
 \subsection{结构类型}
@@ -72,7 +72,7 @@ const Pair = (
 从形势来看，结构表达式是一个拥有具名成员的元组，实际上它确实和元组有很强的交互能力。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto p : Pair = (1, 2);				// 元组类型隐式类型转换为相同布局的任何结构类型。
 	auto tup : (Int, Int) = decay p;	// 相反方向可以通过 decay 函数得到
 };
@@ -101,7 +101,7 @@ AutoScript 中用\textbf{实体（Entity）}来称呼所有一等公民，即可
 \begin{itemize}
     \item \textbf{对象（Object）}：最基本的对象，如整数、字符串、模块等。
 
-    \item \textbf{函数（Function）}：可以调用并成为可执行代码的对象。
+    \item \textbf{函数（functtion）}：可以调用并成为可执行代码的对象。
 
     \item \textbf{类型（Type）}：对应了实体的内存布局，可以用作标注某个实体的属性。如内置类型和结构类型。
 
@@ -205,7 +205,7 @@ AutoScript 中，\textbf{表达式（Expression）}是指一个可以经过\text
 		\lstinline!data! & \lstinline!decay! & \lstinline!decayof! & \lstinline!default! & \lstinline!delete! & \lstinline!deref! \\
 		\lstinline!derefof! & \lstinline!dyn! & \lstinline!else! & \lstinline!equals! & \lstinline!except! & \lstinline!exceptof! \\
 		\lstinline!excluding! & \lstinline!export! & \lstinline!extend! & \lstinline!fall! & \lstinline!fixed! & \lstinline!for! \\
-		\lstinline!forall! & \lstinline!from! & \lstinline!func! & & & \\\hline
+		\lstinline!forall! & \lstinline!from! & \lstinline!funct! & & & \\\hline
 		\multicolumn{6}{|c|}{G-M} \\\hline
 		\lstinline!guard! & \lstinline!hasbase! & \lstinline!hasclass! & \lstinline!if! & \lstinline!implement! & \lstinline!import! \\
 		\lstinline!in! & \lstinline!including! & \lstinline!infer! & \lstinline!instof! & \lstinline!internal! & \lstinline!intrinsic! \\
@@ -233,7 +233,7 @@ AutoScript 考虑到上面一些关键字在某些场景下可能比较繁琐（
     \begin{tabular}{|c c|c c|c c|c c|} \hline
         \lstinline!alias! 	& \$ 或 \lstinline!^^!			& \lstinline!auto!  & \lstinline!!（空） 或 \lstinline!^a! & \lstinline!class! & \lstinline!?:!  或 \lstinline!%c! & \lstinline!const! & \lstinline|!| 或 \lstinline!^c! \\
         \lstinline!data! 	& \lstinline!%! 或 \lstinline!%d! & \lstinline!equals! & \lstinline!=! & \lstinline!forall! & \lstinline!:!! & \lstinline!from! & \lstinline!<<=! \\
-        \lstinline!func! & \lstinline!\! 或 \lstinline!%f!  & \lstinline!is! & \lstinline!?! & \lstinline!new! 	& \lstinline!*! & \lstinline!object! & \lstinline!#:! 或 \lstinline!%o! \\
+        \lstinline!funct! & \lstinline!\! 或 \lstinline!%f!  & \lstinline!is! & \lstinline!?! & \lstinline!new! 	& \lstinline!*! & \lstinline!object! & \lstinline!#:! 或 \lstinline!%o! \\
         \lstinline!static! & \lstinline!'! 或 \lstinline!^s! & \lstinline!struct! & \lstinline!#! 或 \lstinline!%s! & \lstinline!thread! & \lstinline!''! 或 \lstinline!^t! & \lstinline!type! & \lstinline!:! \\\hline
     \end{tabular}
     \caption{阐述关键字和对应的符号}
@@ -320,7 +320,7 @@ AutoScript 考虑到上面一些关键字在某些场景下可能比较繁琐（
         \lstinline!or! & 逻辑或运算符 & \lstinline!expr or expr! & 左 \\\lline{4}
         \lstinline!?=!（\lstinline!class!） & 类族提示符 & \lstinline!?: block! & 无 \\
         \lstinline!%!（\lstinline!data!） & 抽象数据类型提示符 & \lstinline!% Choices! & 无 \\
-        \lstinline!\!（\lstinline!func!） & 函数提示符 & \lstinline!\ pattern -> expr! & 无 \\
+        \lstinline!\!（\lstinline!funct!） & 函数提示符 & \lstinline!\ pattern -> expr! & 无 \\
         \lstinline!#=!（\lstinline!object!） & 对象提示符 & \lstinline!#: block! & 无 \\
         \lstinline!#!（\lstinline!struct!） & 结构提示符 & \lstinline!# pattern! & 无 \\\lline{4}
         \lstinline!|! & 析取运算符 & \lstinline!Tag | Tag! & 左 \\
@@ -382,7 +382,7 @@ const Pair = struct (
     y : Real
 );
 
-const main = func () -> do {
+const main = funct () -> do {
     auto p : Pair = (1.0, 0.0);
     print Pair::x(p);           // 输出 1.0
 };
@@ -399,8 +399,8 @@ const IntTransform = struct (
     f : Int -> Int
 );
 
-const main = func () -> do {
-    auto t : IntTransform = func (x : Int) -> x;
+const main = funct () -> do {
+    auto t : IntTransform = funct (x : Int) -> x;
     print p.f(42);              // 输出 42
 };
 \end{lstlisting}
@@ -412,8 +412,8 @@ const main = func () -> do {
 在两个名字或字面量间没有任何有实际意义的符号都会被理解为一个函数调用。它拥有除了域连接符和点调用符以外最高的优先级。
 
 \begin{lstlisting}
-const main = func () -> do {
-    auto id = func (x : Int) -> x;
+const main = funct () -> do {
+    auto id = funct (x : Int) -> x;
     print id 10 + id 20;        // 输出 30
 };
 \end{lstlisting}
@@ -427,7 +427,7 @@ const main = func () -> do {
 内置运算符关键字是一些和运算符性质相同的关键字，它们拥有不同的运算优先级。第一层级是\lstinline!of! 运算符（注意这个运算符是右结合的）。其次是 \lstinline!as!、\lstinline!hasbase! 和 \lstinline!hasclass! 这三个运算符，再其次分别是按位、包含运算符，和逻辑运算符。这样的顺序有下面的考量：
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     print 42 as Int8 + 24 as Int8;      // 输出 66
     print Int32 of Int16 of 42 as Int8; // 输出 42
     print 1 shl 3 in (1, 2, 3);         // 输出 True
@@ -443,11 +443,11 @@ const main = func () -> do {
 \begin{longtable}{l p{4cm} p{3cm} p{4cm}} \hline
 		属性 & 参数说明 & 解释 & 用例 \\\hline
 		\lstinline!@alert(msg)! & \lstinline!msg : () -> ()! 为一个输出信息的函数 & 在某个语句抛出异常时调用给定的函数 & \lstinline!@alert(msg) assert [expr];! \\\hline
-		\lstinline!@capture(q)! & \lstinline!q : Prelude.Query! 为一个查询结构 & 为函数设置显式捕获 & \lstinline!func @capture(q) [pattern] -> [expr]! \\\hline
+		\lstinline!@capture(q)! & \lstinline!q : Prelude.Query! 为一个查询结构 & 为函数设置显式捕获 & \lstinline!funct @capture(q) [pattern] -> [expr]! \\\hline
 		\lstinline!@choice! & - & 让 \lstinline!do! 表达式返回一个选择类型 & \lstinline!@choice do [block]! \\\hline
 		\lstinline!@ctor! & - & 让结构类型可以类似函数调用一样构建对象 & \lstinline!@ctor [var-decl];! \\\hline
 		\lstinline!@default(e)! & \lstinline!e : T! 为任意的字面量 & 为参数设定默认值 & \lstinline!@default(e) [pattern]! \\\hline
-		\lstinline!@impl(c)! & \lstinline!c : Class! 为一个类族 & 声明某个类型对特定类族的实现 & \lstinline!@impl(c) [func-decl]! \\\hline
+		\lstinline!@impl(c)! & \lstinline!c : Class! 为一个类族 & 声明某个类型对特定类族的实现 & \lstinline!@impl(c) [funct-decl]! \\\hline
 		\lstinline!@inline! & - & 让模块的名字被无修饰地导入进来 & \lstinline!@inline import [id];! \\\hline
 		\lstinline!@layout(T)! & \lstinline!T : Type! 为一个元组类型 & 为类型设定内存布局 & \lstinline!const [id] : @layout(T) Type;! \\\hline
 		\lstinline!@name(s)! & \lstinline!s : String! 为一个名字 & 为语句块指定名字 & \lstinline!@name(s) [block]!  \\\hline
@@ -479,7 +479,7 @@ AutoScript 在设计之初对括号的作用经过深思熟虑。首先，圆括
 具名作用域并不是循环语句的特权，因此我考虑了在非循环语句中使用跳转语句的可行性，并察觉到了它的价值。\lstinline!break! 语句可以用于跳出任何复合语句，\lstinline!continue! 语句可以用于无条件的循环语句。然而，这就让不带标签的跳转语句变得无用，因为通常来讲我们总是先进行某个判断（用 \lstinline!if! 语句），随后决定 \lstinline!break! 或 \lstinline!continue!，但如果这两个语句的目标是最内层的语句块，那么它们会被 \lstinline!if! 语句捕获。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	scan x : mut Int;
 	while (True) {
 		if (x == 42) {
@@ -493,7 +493,7 @@ const main = func () -> do {
 第一种解决方案是倡导使用子句，因为 \lstinline!if! 子句不引入新的作用域：
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	scan x : mut Int;
 	while (True) {
 		break if (x == 42);
@@ -507,7 +507,7 @@ const main = func () -> do {
 第二种解决方案是让跳转语句默认跳转上一层语句块。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	scan x : mut Int;
 	while (True) {
 		if (x == 42) {
@@ -528,7 +528,7 @@ const main = func () -> do {
 第三种解决方案是引入一个上下文关键字，\lstinline!loop!。当在跳转语句后使用这个关键字时，会跳出最内层的一个循环。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	scan x : mut Int;
 	while (True) {
 		if (x == 42) {

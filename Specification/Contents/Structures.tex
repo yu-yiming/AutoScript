@@ -1,16 +1,19 @@
 \begin{introduction}
-    \item 结构
-    \item 方法
+    \item 结构表达式
+    \item 成员
+    \item 成员函数
     \item 结构属性
     \item 结构作用域
     \item 构造函数
     \item 析构函数
+    \item 垃圾回收
     \item 静态成员
     \item 常量成员
     \item \lstinline!object! 表达式
-    \item 查询结构
+    \item 查询结构的本质
     \item 部分对象
     \item \lstinline!missing! 关键字
+    \item 结构对象的格式化
 \end{introduction}
 
 \section{结构表达式}
@@ -51,7 +54,7 @@ const Point : Type;
 const Point = (x : Int, y : Int);
 \end{lstlisting}
 
-无论是 \lstinline!@layout! 还是 \lstinline!@size! 属性，都要求声明的布局和大小与定义一致，否则会产生编译错误。
+无论是 \lstinline!@layout! 还是 \lstinline!@size! 属性，都要求声明的布局和大小与定义完全一致，否则会产生编译错误。
 
 \begin{lstlisting}
 @size(0)
@@ -71,11 +74,26 @@ const Segment = struct (
 );
 \end{lstlisting}
 
-这是因为，使用一个类型时只需要知道该类型的大小。
+这是因为，使用一个类型时只需要知道该类型的大小。这可以让循环引用在一些情况下可以出现：
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+@size(8)
+const A : Type;
+@size(8)
+const B : Type;
+
+const A = (b : B);
+const B = (a : A);
+\end{lstlisting}
+\end{minipage}
+
+不过它们无法保存任何有效信息。
 
 \section{成员}
 
-\subsection{成员的声明}
+\subsection{成员的本质}
 
 结构中声明的变量称为\textbf{成员（Member）}。它的本质是一个拥有修饰名字的函数。
 
@@ -87,14 +105,16 @@ const ::Point::x : ref mut? Point -> ref mut? Real = this -> (decay this)[0];
 const ::Point::y : ref mut? Point -> ref mut? Real = this -> (decay this)[1];
 \end{lstlisting}
 
-这里出现的结构 \lstinline!::Point::x! 正是我们上一章介绍的\emph{修饰名字}，这也暗示了结构本身构成了一个作用域。上面用到的内置函数 \lstinline!decay! 会将结构类型的对象转化为相同内存布局的元组引用类型，即 \lstinline!(Real, Real)!；在这个过程中 \lstinline!Point! 对象并没有被复制出来，而是通过它的引用构建了相同内存布局的元组引用 \footnote{熟悉 C++ 的读者可以将其看作两个指针类型的 \lstinline!reinterpret_cast!，由于它们的内存布局完全相同，其行为是符合预期的。}。 \\
+这里出现的结构 \lstinline!::Point::x! 正是我们上一章介绍的\emph{修饰名字}，这也暗示了结构本身构成了一个作用域。上面用到的内置函数 \lstinline!decay! 会将结构类型的对象转化为相同内存布局的元组引用类型，即 \lstinline!(Real, Real)! 和它的\emph{兼容类型}；在这个过程中 \lstinline!Point! 对象并没有被复制出来，而是通过它的引用构建了相同内存布局的元组引用 \footnote{这个过程和上一节中我们在模式匹配部分见到的例子 \lstinline!ref tup! 效果相同。熟悉 C++ 的读者可以将其看作两个指针类型的 \lstinline!reinterpret_cast!，由于它们的内存布局完全相同，其行为是符合预期的。}。 \\
 
 在我们利用点调用符访问成员时，编译器也会将其变为对应函数的调用。
 
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
 \begin{lstlisting}
 const Point = struct (x : Real, y : Real);
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto p : Point = (42, 0);
 	print p.x;					// 输出 42
 
@@ -102,15 +122,17 @@ const main = func () -> do {
 	print ::Point::x(p);
 };
 \end{lstlisting}
+\end{minipage}
+
 
 我们可以主动使用修饰名字来指定要调用的函数。
 
 \begin{lstlisting}
 const Point = struct (x : Real, y : Real);
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto p : Point = (42, 0);
-	const x = func (p : Point) -> 24;
+	const x = funct (p : Point) -> 24;
 	print x(p);							// 输出 24
 	print ::Point::x(p);				// 输出 42
 };
@@ -125,9 +147,9 @@ const main = func () -> do {
 
 \begin{lstlisting}
 const Vec = struct (x : Real, y : Real);
-const sub = func (this : Vec, other : Vec) -> (this.x - other.x, this.y - other.y) as Vec;
+const sub = funct (this v : Vec, other : Vec) -> (v.x - other.x, v.y - other.y) as Vec;
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto v : Vec = (1.0, 2.0);
 	auto u : Vec = (1.0, 1.0);
 	print v.sub(u);				// 输出 0.0, 1.0
@@ -138,19 +160,91 @@ const main = func () -> do {
 
 注意，我们也可以在结构中声明函数，但它对所在结构中其它的变量一无所知；其地位和所有其它成员相同。
 
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
 \begin{lstlisting}
 const Vec = struct (
 	x : Real, y : Real,
 	transform : Vec -> Vec
 );
 
-const main = func () -> do {
-	auto v : Vec = (1.0, 2.0, func (v : Vec) -> v);
-	print (v.transform)(1.0, 2.0);						// 输出 1.0, 2.0
+const main = funct () -> do {
+	auto v : Vec = (1.0, 2.0, funct (v : Vec) -> v);
+	print v.transform(1.0, 2.0);						// 输出 1.0, 2.0
+};
+\end{lstlisting}
+\end{minipage}
+
+
+注意到上面的 \lstinline!v.transform! 在 AutoScript 中有两种潜在的含义：其或者是基于包含 \lstinline!this! 参数的函数，或者是一个成员（这里的含义）。我们需要避免成员名称和函数名称雷同。
+
+\begin{lstlisting}
+const Foo = struct (bar : Int);
+const bar = funct (this f : Foo) -> 42;		// 编译错误，::Foo::bar 重复定义。
+\end{lstlisting}
+
+
+\subsection{默认初始化}
+
+回忆 \lstinline!default! 可以让内置类型得到一个默认的初始值，这对结构类型对象也有类似的效果：对象中每个成员都会通过 \lstinline!default! 来初始化。通过这种方式我们可以简洁地构建一个结构类型变量。
+
+\begin{lstlisting}
+const Point = struct (x : Real, y : Real);
+
+const main = funct () -> do {
+	auto origin : Point = default;
 };
 \end{lstlisting}
 
-上面我们必须使用 \lstinline!(v.transform)!，否则编译器会将其理解为一个带有参数的点调用表达式，此时它会被理解为 \lstinline!::Vec::transform!，然而在 \lstinline!::Vec! 作用域中并没有定义这个函数，因此编译失败。 \\
+和函数参数类似地，我们可以用 \lstinline!@default! 属性为其设置默认值：
+
+\begin{lstlisting}
+const Point = struct (
+	@default(1.0) x : Real,
+	@default(2.0) y : Real
+);
+
+const main = funct () -> do {
+    auto p : Point = default;
+    print p.x;					// 输出 1.0
+    print p.y;					// 输出 2.0
+}
+\end{lstlisting}
+
+设置缺省属性后，如果我们为这个成员初始化为 \lstinline!default!，它会自动用设定的值代替。不过，此后再次用 \lstinline!default! 为其赋值时，会统一按照内置类型的缺省值。 \\
+
+和缺省属性功能类似的便是缺省声明。我们可以用查询结构来初始化一个结构类型变量。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const Point = struct (
+    x ?? 1.0 : Real,
+    y ?? 2.0 : Real
+);
+
+const main = funct () -> do {
+    auto p : Point = [x = 42.0];
+    print p.y;					// 输出 2.0 
+};
+\end{lstlisting}
+\end{minipage}
+
+
+我们可以省略类型标注，不过这实际上定义了一个结构模版；当缺省声明没有被使用时，它可以是任何类型：
+
+\begin{lstlisting}
+const Point = struct (
+    x = 1.0,
+    y = 2.0
+);
+
+const main = funct () -> do {
+    auto p : Point = [x = 42];
+    print typeof(p.x);			// 输出 Int
+};
+\end{lstlisting}
+
 
 \subsection{结构属性}
 
@@ -158,7 +252,7 @@ const main = func () -> do {
 
 \begin{grammar}[结构属性 \texttt{[property-attr]}] \label{grm:structure-property}
 \begin{enumerate}
-	\item \lstinline!@prop! \texttt{([get-func-name], [set-func-name])}
+	\item \lstinline!@prop! \texttt{([get-funct-name], [set-funct-name])}
 	\item \lstinline!@prop!
 \end{enumerate}
 \end{grammar}
@@ -171,7 +265,7 @@ const Person = struct (
 	@prop(get_greeting, undefined) greeting : String
 );
 
-const get_greeting = func (this : ref mut? Person) -> "Hello, $(this.name)";
+const get_greeting = funct (this : ref mut? Person) -> "Hello, $(this.name)";
 \end{lstlisting}
 
 在结构属性的声明处不需要给出访问辅助函数的类型，这是因为它们的类型是确定的。对于在结构 \lstinline!S! 中声明为 \lstinline!T! 类型的属性，它的两个辅助函数类型一定是：
@@ -188,29 +282,63 @@ const Foo = struct (
 	@prop(getter, setter) x : Int
 );
 // 这里省略 getter 和 setter 的定义
-const main = func () -> do {
+const main = funct () -> do {
 	auto foo : mut Foo = 42;
 	print foo.x;
 	foo.x <- 24;
-	// 编译器会类似生成下面的代码，这不是真实的情况
+	// 编译器会类似生成下面的代码
 	print getter(foo);
 	setter(foo, 24);
 };
 \end{lstlisting}
 
-实际上编译器对 AutoScript 中的结构属性有特定的操作方式，其中利用了辅助类型 \lstinline!Prelude.Proxy!，简单来说就是让点调用返回一个特殊类型的变量，它在被赋值或赋值给其它对象时有不同的行为。我们会在 AutoScript 标准库的章节中详细介绍。
+实际上编译器对 AutoScript 中的结构属性有特定的操作方式，其中利用了辅助类型 \lstinline!Prelude.Proxy!，简单来说就是让点调用返回一个特殊类型的变量，它在被赋值或赋值给其它对象时有不同的行为。我们会在 AutoScript 标准库的章节中详细介绍。 \\
+
+由于结构属性依赖于 \lstinline!getter! 和 \lstinline!setter!，并不一定需要一个内存位置，因此 AutoScript 提供了 \lstinline!@skip! 属性来让编译器不将其视作内存位置。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const Vec2 = struct (
+    x : Real,
+    y : Real,
+    @prop(length, undefined) length : Real
+);
+
+const main = func () -> do {
+    print decayof(Vec2);		// 输出 (Real, Real)
+};
+\end{lstlisting}
+\end{minipage}
+
+这里使用的 \lstinline!decayof! 是作用在类型上的内置函数，其得到相同内存布局的元组类型。 \\
+
+我们可以为结构的属性设置缺省值，或者通过默认属性，或者通过默认声明。它们能使用的前提是结构属性拥有内存位置。
+
+\begin{lstlisting}
+const Foo = struct (
+    @default(42) @prop(a_getter, undefined) a : Int;
+    @default(24) @skip @prop(b_getter, b_setter) b : Int;
+);
+
+const main = funct () -> do {
+    auto foo : Foo = default;
+    print foo.a;				// 输出 42
+    print foo.b;				// 输出取决于 b_getter，不一定是 24
+};
+\end{lstlisting}
 
 
-\section{结构作用域}
+\section{成员的生命周期}
 
-结构作用域是一个虚拟的作用域，当我们定义结构类型的对象时，所有其中的成员都会拥有和该对象相同的生命周期。因此，可以认为结构作用域指的是结构类型对象所在的作用域。
+\emph{结构作用域}是一个虚拟的作用域，当我们定义结构类型的对象时，所有其中的成员都会拥有和该对象相同的生命周期,其所在的作用域便是结构对象所在的作用域。
 
 \begin{lstlisting}
 const Point = struct (x : Real, y : Real);
 
-const main = func () -> do {
-	auto p1 : Point = (1.0, 0.0);	// p.x 和 p.y 的作用域是 p 的作用域，也就是 do 表达式的语句块
-	static p2 : Point = (1.0, 0.0);	// 同样，作用域是 do 表达式的语句块；不过它们的生命周期是整个程序执行期间
+const main = funct () -> do {
+	auto p1 : Point = (1.0, 0.0);	// p.x 和 p.y 的作用域是 p1 的作用域，生命周期与 p1 相同
+	static p2 : Point = (1.0, 0.0);	// 同样，作用域是 do 表达式的语句块，生命周期与 p2 相同
 };
 \end{lstlisting}
 
@@ -224,7 +352,7 @@ const main = func () -> do {
 @ctor
 const Complex = struct (real : Real, imag : Real);
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto c = Complex (1.0, 2.0);	// 可以利用类似函数调用的语法创建对象
 };
 \end{lstlisting}
@@ -236,77 +364,54 @@ import Math;
 @ctor
 const Complex = struct (real : Real, imag : Real);
 @ctor
-const unit_circle = func (theta : Real) -> (Math.cos(theta), Math.sin(theta)) as Complex;
+const unit_circle = funct (theta : Real) -> (Math.cos(theta), Math.sin(theta)) as Complex;
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto c = Complex(Math.PI);		// 调用了 unit_circle
 };
 \end{lstlisting}
 
 当结构类型拥有多个构造函数时，编译器会根据传入参数的类型来推断应该调用哪个具体的函数；唯一的特例是结构变量本身，我们不需要为其定义函数。某种角度来看，这里的行为是一种更强的“函数重载” \footnote{在 C++ 等支持函数重载的语言中，所有的函数都可以像这样重载。不过这会导致非常复杂的重载决议，以及可能导致难懂的函数底层接口。因此在 AutoScript 中，只对构造函数开放全参数类型的重载。}。 \\
 
-除了通过显式类型转换和构造器来构建结构类型的对象，还可以通过 \lstinline!default! 来初始化它。此时所有的成员都会通过 \lstinline!default! 来初始化。对于内置的类型来说，其默认值如下：
+下面是编译器处理构造函数的近似行为：
 
-\begin{itemize}
-	\item \lstinline!Int!：默认值为 0。
-	\item \lstinline!Real!：默认值为 0.0。
-	\item \lstinline!String!：默认值为空字符串 \lstinline!""!。
-\end{itemize}
-
-通过这种方式我们可以简洁地构建一个结构类型变量。
-
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
 \begin{lstlisting}
-const Point = struct (x : Real, y : Real);
+@ctor
+const Foo = struct ();
+@ctor
+const ctor_1 = funct (x : Int) -> () as Foo;
+@ctor
+const ctor_2 = funct (x : Real) -> () as Foo;
 
-const main = func () -> do {
-	auto origin = default as Point;
+// 编译器会生成下面的代码
+const Foo__ctor = funct (...args) -> do {
+	// 按照声明顺序依次尝试调用
+    try return ctor_Foo(...args);
+    try return ctor_1(...args);
+    try return ctor_2(...args);
 };
 \end{lstlisting}
+\end{minipage}
 
-这个例子或许看不出 \lstinline!default! 的便捷性。让我们介绍结构中变量的默认初始化声明。
-
-\begin{lstlisting}
-const Point = struct (
-	x : Real = 1.0,
-	y : Real = 2.0
-);
-\end{lstlisting}
-
-上面我们在声明成员的同时，也给出了一个初始化表达式。此时编译器会将当前成员的默认值设置为这个初始化表达式的值。随后当我们使用 \lstinline!default! 来构建 \lstinline!Point! 类型变量时，编译器会用这些值来初始化 \lstinline!x! 和 \lstinline!y!。成员的默认初始化声明只对结构类型对象初始化时有效，如果后续我们再次用 \lstinline!default! 为该成员赋值时，它只会按照其类型的默认值来赋值。
+AutoScript 中得益于\emph{垃圾回收机制}，我们通常不需要手动回收任何资源，不过我们依然可以定义析构函数让结构类型对象在被释放前调用它。
 
 \begin{lstlisting}
-const WrapInt = struct (x : Int = 42);
-
-const main = func () -> do {
-	auto w = default as WrapInt;
-	print w.x;					// 输出 42
-	w.x <- default;
-	print w;					// 输出 0
-};
-\end{lstlisting}
-
-默认初始化声明中，可以省略类型标注，因为初始化器可以帮助编译器推断成员变量的类型：
-
-\begin{lstlisting}
-const Point = struct (
-    x = 1.0,
-    y = 2.0
-);
-\end{lstlisting}
-
-最后，让我们介绍 AutoScript 的析构机制。得益于\emph{垃圾回收机制}，我们通常不需要手动回收任何资源，不过我们依然可以定义析构函数让结构类型对象在被释放前调用它。
-
-\begin{lstlisting}
-const Person = struct (name : String);
+const Person = struct (name : String); 
 @dtor
-const farewell = func (ref mut? Person) -> print "Goodbye~";
+const farewell = funct (ref mut? Person) -> print "Goodbye~";
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto p : Person = "Alice";
 };								// 自动存储期变量再此被释放，释放之前会调用 farewell 函数
 \end{lstlisting}
 
 和构造函数不同的是，析构函数只能存在一个。对于复合对象，系统会首先按顺序析构所有子对象，随后再析构复合对象本身。
+
+
+
+
 
 \subsection{非自动存储期的成员}
 
@@ -317,7 +422,7 @@ const Static = struct (
 	static value : mut Int
 );
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto s1 : Static = ();
 	auto s2 : Static = ();
 	s1.value = 42;
@@ -333,7 +438,7 @@ const Static = struct (
 );
 
 // 编译器会生成下面的代码
-const ::Static::value = func (@unused this : ref mut? Static) -> do {
+const ::Static::value = funct (@unused this : ref mut? Static) -> do {
 	static value : mut Int;
 	return ref value;
 };
@@ -347,11 +452,52 @@ const TrueType = struct (
 );
 
 // 编译器会生成下面的代码
-const ::TrueType::value = func (@unused this : ref mut? TrueType) -> do {
+const ::TrueType::value = funct (@unused this : ref mut? TrueType) -> do {
 	const value = 42;
 	return ref value;
 };
 \end{lstlisting}
+
+最后，让我们简单着重介绍动态存储期的成员。AutoScript 中用 \lstinline!new! 限定符来声明一个动态存储期的变量。默认情况下它是受垃圾回收器\emph{托管}的，因此如果在其所在作用域中我们没有将其引用传递到其它作用域，那么在当前作用域结束后由于\emph{引用计数}归零，它和自动存储期变量一样会被回收。
+
+\begin{lstlisting}
+const main = funct () -> do {
+    new x = 42;
+};								// 作用域结束时 x 被自动释放
+\end{lstlisting}
+
+AutoScript 也提供了能够手动控制内存的方式，我们需要为变量使用 \lstinline!@manual! 属性。此时垃圾回收器会放弃对这个变量的托管，我们需要用 \lstinline!delete! 关键字手动将其释放。通常会在析构函数中进行。
+
+\begin{lstlisting}
+const MyInt = struct (
+    new value : Int;
+);
+
+@dtor
+const destroy_int = funct (i : ref MyInt) -> do {
+    delete i;
+};
+
+const main = funct () -> do {
+    auto i : MyInt = 42;
+};								// 在这里调用了析构函数，手动释放了动态存储期的变量
+\end{lstlisting}
+
+值得说明的是，即使是受托管的动态存储期变量，我们依然可以用 \lstinline!delete! 语句将当前的引用删除；如果此时不存在任何这个变量的引用，则会释放它的内存。 \\
+
+内存被释放之后的动态存储期变量，其值是 \lstinline!invalid!。我们无法再对其进行任何操作。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+    new x = 42;
+    delete x;
+    print x;					// 运行期错误，x 处于非法状态
+};
+\end{lstlisting}
+\end{minipage}
+
 
 \section{自定义对象}
 
@@ -363,13 +509,13 @@ AutoScript 中，除了通过 \lstinline!struct! 关键字构建结构后声明�
 	\lstinline!object [block]!
 \end{grammar}
 
-在对象表达式的语句块中，所有的自动存储期变量声明都会默认看作生成对象的一个内存位置。
+在对象表达式的语句块中，所有的自动存储期和动态存储期变量声明都会默认看作生成对象的一个内存位置。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto p = object {
-		auto x = 42;		// 第一个内存位置
-		auto y = 24;		// 第二个内存位置
+		x = 42;				// 第一个内存位置
+		new y = 24;			// 第二个内存位置
 	};
 	print p.x;				// 输出 42
 };
@@ -378,16 +524,16 @@ const main = func () -> do {
 可以猜到，对象表达式会让编译器生成一个匿名的结构，其对应的内存位置初始化为给定的表达式值。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto p = object {
-		auto x = 42;
-		auto y = 24;
+		x = 42;
+		new y = 24;
 	};
 	
 	// 编译器会生成下面的代码
 	const p__object = struct (
-		x : Int ?? 42,
-		y : Int ?? 24
+		@default(42) x : Int,
+		@default(24) new y : Int
 	);
 	auto p : p__object = default;
 };
@@ -395,10 +541,10 @@ const main = func () -> do {
 
 对象表达式可以用来方便地生成临时的复合类型对象，不过由于它的类型难以复用（需要利用 \lstinline!typeof! 关键字），所以如果需要超过一次使用该类型的场合，还是应该显式写出结构声明。 \\
 
-对象表达式中的\emph{初始化}顺序决定了编译器生成类型内存位置的顺序。
+对象表达式中的\emph{初始化}顺序决定了编译器生成类型内存位置的顺序。因此即使提前声明一个成员，它只会在初始化时加到内存位置中。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     auto p = object {
         auto y : Int;
         auto x = 42;
@@ -407,8 +553,8 @@ const main = func () -> do {
     
     // 编译器会生成下面的代码
     const p__object = struct (
-        x : Int ?? 42,
-        y : Int ?? 24
+        @default(42) x : Int,
+        @default(24) y : Int
     );
     auto p : p__object = default;
 };
@@ -417,7 +563,7 @@ const main = func () -> do {
 在对象表达式中我们可以使用所有的语句，不过需要特别小心自动存储期变量的声明（它会被默认作为对象的一个内存位置）。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto p = object {
 		scan x : Int;		// 注意这里暗含了一个自动存储期变量的声明
 		scan y : Int;
@@ -427,7 +573,7 @@ const main = func () -> do {
 
 至于对象表达式中的其它存储期变量，其行为和结构中其它存储期成员的行为类似。
 
-\subsection{查询结构}
+\subsection{查询结构的本质}
 
 AutoScript 中支持查询结构。从本质来讲它是对象表达式的语法糖。下面让我们罗列在查询结构中，方括号里可以出现的内容：
 
@@ -440,17 +586,17 @@ AutoScript 中支持查询结构。从本质来讲它是对象表达式的语法
 请参考下面的例子：
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto q1 = [0, x = 3];			// 定义了内存布局为 (Int, Int) 的查询结构，其中第一个位置是匿名成员
 	auto q2 = [(x, y) = decay q1];	// 在查询结构中使用模式匹配来初始化其中的成员
 	auto q3 = [? 42];				// 在查询结构中使用模式匹配来构建一个约束
 };
 \end{lstlisting}
 
-可以看到，前两种形式都在查询结构中创建了拥有内存位置的成员，而最后一种仅仅用来给出查询信息。下面让我么看看查询结构作为查询信息的功能。
+可以看到，前两种形式都在查询结构中创建了拥有内存位置的成员，而最后一种仅仅用来给出查询信息。下面让介绍查询结构作为查询信息的功能。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto p = object { x = 42, y = 24 };
 	auto q = mut (1, 2, 3);
 	print p[:? Int];					// 输出 42, 24
@@ -465,7 +611,7 @@ const main = func () -> do {
 当查询的条件比较复杂时（析取一个合取式），我们可以使用嵌套的查询结构。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto x = object { x = 42, y = 0, z = 2.0 };
 	print x[:? Real, [:? Int][? (\x -> x > 0)]];	// 输出 42, 2.0
 };
@@ -474,7 +620,7 @@ const main = func () -> do {
 合取一个析取式会简单很多：
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto x = object { x = 42, y = "abc", z = 0.0 };
 	print x[:? Int, ?: Real][? (\x -> x > 0)];		// 输出 42
 };
@@ -491,7 +637,7 @@ const Pair = struct (
 	y : Int
 );
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto p : Pair = (1, 0);
 	print typeof(x[0]);				// 输出 Partial[Pair]
 };
@@ -505,7 +651,7 @@ const Pair = struct (
 	y : Int
 );
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto p : Pair = (1, 0);
 	auto px = p[? 1];
 	print px.query(Pair::x);		// 输出 1
@@ -516,7 +662,7 @@ const main = func () -> do {
 这里我们使用的 \lstinline!query! 函数用来得到部分对象中，原对象的成员的值。值为 \lstinline!missing! 的各个对象，在任何操作的时候都会被忽略 \footnote{它可以理解为安全的 \lstinline!undefined!，后者一旦求值则产生运行时错误。}。对部分对象使用任何运算符时，会依次访问其中元素：
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto p : Partial = (1, 2);		// 构建了一个部分对象（虽然它实际上是完全的）
 	auto q : Partial = (3, 4);
 	print p * q;					// 输出 3, 4, 6, 8
@@ -525,3 +671,33 @@ const main = func () -> do {
 
 这实际上源于 \lstinline!Partial! 的实例类型属于 \lstinline!Monad! 类族。我们会在类族的章节中详细介绍这个性质。
 
+
+\subsection{undefined 和 missing}
+
+至此，我们遇到了两种表示“未定义”的字面量，\lstinline!undefined! 和 \lstinline!missing!。前者是所有未经初始化变量的默认值，在求值时会中断程序；后者则是对象经过查询结构筛选后产生的“空洞”，在求值时会被跳过。本节让我们考察在一些场景中，将 \lstinline!undefined! 替换为 \lstinline!missing! 会有何效果。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+    auto x : Int = missing;
+    print x;					// 无事发生
+    auto y = x + 10;			// y 也变成 missing
+    print x.foo();				// 编译错误，Int 上没有定义 foo 函数
+};
+\end{lstlisting}
+\end{minipage}
+
+可以看到，拥有 \lstinline!missing! 值的变量依然可以像正常那样进行操作，不过表达式的结果一律会变成 \lstinline!missing!。 \\
+
+此外，前面介绍过的缺省声明和缺省属性对 \lstinline!missing! 一样会触发。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+    auto x ?? 42 : Int = missing;
+    print x;						// 输出 42
+};
+\end{lstlisting}
+\end{minipage}

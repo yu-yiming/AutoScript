@@ -33,15 +33,17 @@ const main = func () -> do {
 \begin{lstlisting}
 const main = func () -> do {
 	auto x : infer T;		// 声明了一个拥有推导类型 T 的变量 x，这样的实体也被称为对象模版
+	print(typeof(x));		// 输出 Unresolved，这是定义在 Prelude 模块中的，表示未确定类型
+	auto x = 42;			// x 的初始化
 };
 \end{lstlisting}
 
 在函数参数列表中，我们可以声明一个对象模版。编译器会根据函数调用处的参数类型来推断推导类型的实际类型 \footnote{注意 \lstinline!x : T! 和 \lstinline!x : infer T! 的相同和不同之处：两者都保证 \lstinline!x! 的类型是 \lstinline!T!，但前者（在 \lstinline!T! 已知时）会将初始化表达式隐式转换为 \lstinline!T!，后者则会通过初始化表达式的类型来确定 \lstinline!T!。}。
 
 \begin{lstlisting}
-const add = func (x : infer T, y : T) -> x + y;
+const add = funct (x : infer T, y : T) -> x + y;
 
-const main = func () -> do {
+const main = funct () -> do {
 	print add(1, 2);		// 输出 3
 	print add(1.0, 2.0);	// 输出 3.0
 };
@@ -50,31 +52,31 @@ const main = func () -> do {
 在上面的例子中，我们只在参数 \lstinline!x! 后使用了推导类型的声明，因此编译器只会根据这个参数来推断 \lstinline!T!，至于 \lstinline!y! 则会尝试将传入的参数隐式转换为类型 \lstinline!T!。当然，我们也可以同时为 \lstinline!y! 声明推导类型 \lstinline!infer T!，此时编译器会强制要求两个参数的类型推断结果完全相同。
 
 \begin{lstlisting}
-const add = func (x : infer T, y : infer T) -> x + y;
+const add = funct (x : infer T, y : infer T) -> x + y;
 
-const main = func () -> do {
+const main = funct () -> do {
 	print add(1, 2.0);		// 编译错误，推导类型冲突
 };
 \end{lstlisting}
 
-诸如上面这些参数中包含推导类型的函数称为\textbf{函数模版（Function Template）}。函数模版中，可以省略推导类型的声明（即省略 \lstinline!infer! 关键字），此时编译器会将第一次出现的类型作为推导类型的推断标准。
+诸如上面这些参数中包含推导类型的函数称为\textbf{函数模版（functtion Template）}。函数模版中，可以省略推导类型的声明（即省略 \lstinline!infer! 关键字），此时编译器会将第一次出现的类型作为推导类型的推断标准。
 
 \begin{lstlisting}
-const add = func (x : T, y : T) -> x + y;
-// 上面的函数相当于 func (x : infer T, y : T) -> x + y
+const add = funct (x : T, y : T) -> x + y;
+// 上面的函数相当于 funct (x : infer T, y : T) -> x + y
 \end{lstlisting}
 
 更简洁地，我们可以完全省略函数的参数类型声明，此时编译器会将每个这样的参数视作声明了一个推导类型。
 
 \begin{lstlisting}
-const add = func (x, y) -> x + y;
-// 上面的函数相当于 func (x : infer T, y : infer U) -> x + y
+const add = funct (x, y) -> x + y;
+// 上面的函数相当于 funct (x : infer T, y : infer U) -> x + y
 \end{lstlisting}
 
 从函数上推导类型的简化形式可以反推对象模版（也就是最原始形式的推导类型）也可以省略 \lstinline!infer! 关键字，甚至推导类型声明 \footnote{细心的读者会想到，由于 \lstinline!auto! 本身可以被省略，那么莫非 \lstinline!x! 本身就是一个变量声明？在函数中确实是这样的，在其他地方也是如此。如果 \lstinline!x! 不曾被声明，那么 \lstinline!x;! 这个语法就构成了它的声明。显然这样的写法不应被提倡，但它的有效性是水到渠成的。}：
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto x : T;				// 声明了一个对象模版
 	auto y;					// 声明了一个对象模版
 };
@@ -87,9 +89,9 @@ const main = func () -> do {
 编译器在遇到一个函数模版时，不会对其返回类型进行推断（因为它通常做不到）。在函数模版被调用时，编译器会根据参数类型生成一个模版的\textbf{实例化（Instantiation）}。实例化的可访问性与所在作用域和模版本身相同。
 
 \begin{lstlisting}
-const add = func (x, y) -> x + y;
+const add = funct (x, y) -> x + y;
 
-const main = func () -> do {
+const main = funct () -> do {
 	print add(1, 2);		// 编译器会实例化一个函数 add__Int__Int : (Int, Int) -> Int
 	print add(2.0, 0.0);	// 编译器会实例化一个函数 add__Real__Real : (Real, Real) -> Real
 };
@@ -100,11 +102,11 @@ const main = func () -> do {
 实例化有时会失败，这是因为实例化的参数不一定满足模版中使用的函数（和运算符）的声明，或者函数本身有缺陷。此时会产生编译错误。
 
 \begin{lstlisting}
-const f = func (x) -> do {
+const f = funct (x) -> do {
 	return f(x);			// 不存在实例化时不会报错
 };
 
-const main = func () -> do {
+const main = funct () -> do {
 	f(42);					// 编译错误，无法推断 f 的类型，实例化失败
 };
 \end{lstlisting}
@@ -117,7 +119,7 @@ const f : (infer T) -> T = guard
 	:? String -> "Hello, world",
 	otherwise -> undefined;
 	
-const main = func () -> do {
+const main = funct () -> do {
 	print f("abc");			// 输出 Hello, world
 };
 \end{lstlisting}
@@ -127,9 +129,9 @@ const main = func () -> do {
 如果对一个函数模版使用 \lstinline!typeof! 函数，其结果可能有些出乎意料。
 
 \begin{lstlisting}
-const add = func (x, y) -> x + y;
+const add = funct (x, y) -> x + y;
 
-const main = func () -> do {
+const main = funct () -> do {
 	print typeof(add);		// 输出 (Type, Type) -> Unresolved
 };
 \end{lstlisting}
@@ -137,20 +139,20 @@ const main = func () -> do {
 可以看到虽然 \lstinline!add! 的类型确实是一个函数，但它却是接受两个常量存储期类型，并返回不确定类型 \lstinline!Prelude.Unresolved! 的函数。事实上，编译器在看到一个带有 \lstinline!infer! 的参数列表时，会将其作如下处理：
 
 \begin{lstlisting}
-const add = func (x, y) -> x + y;
+const add = funct (x, y) -> x + y;
 
 // 编译器会生成下面的代码
-const add = func (const T : Type, const U : Type) 
-	-> func (x : infer T, y : infer U) -> x + y;
+const add = funct (const T : Type, const U : Type) 
+	-> funct (x : infer T, y : infer U) -> x + y;
 \end{lstlisting}
 
 对于这样接收的参数包含常量存储期的函数，在调用时可以跳过一步调用，并通过后续调用中的实际参数的类型推断来得到这些参数的值。这也就是模版实例化的本质。如果依靠 \lstinline!infer! 的层级超过了一次调用，则不能用来推断这些常量存储期的参数。
 
 \begin{lstlisting}
-const f = func (const T : Type, const U : Type) 
-	-> func (x : infer T) -> func (y : infer U) -> x + y;
+const f = funct (const T : Type, const U : Type) 
+	-> funct (x : infer T) -> funct (y : infer U) -> x + y;
 	
-const main = func () -> do {
+const main = funct () -> do {
 	f(2)(3);			// 错误，U 未初始化
 	f[U = Int](2)(3);	// 没问题
 };
@@ -168,7 +170,7 @@ const Point = struct (
 	y : T
 );
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto p : Point = (1, 0);	// 类型为 Point [T = Int]
 };
 \end{lstlisting}
@@ -179,9 +181,9 @@ const main = func () -> do {
 const Point = struct (x : infer T, y : T);
 
 // 编译器会生成下面的代码
-const Point = func (const T : Type) -> struct (x : infer T, y : T);
+const Point = funct (const T : Type) -> struct (x : infer T, y : T);
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto p1 : Point = (1, 0);
 	auto p2 : Point[T = Int] = (1, 0);
 	auto p3 : Point(Int) = (1, 0);
@@ -197,10 +199,10 @@ const main = func () -> do {
 const Pair = struct (x : infer T, y : T);
 
 // 编译器会生成下面的代码
-const Pair = func (const T : Type) -> struct (x : infer T, y : T);
-const Pair__ctor = func (x : infer T, y : T) -> (x, y) as Pair(T);
+const Pair = funct (const T : Type) -> struct (x : infer T, y : T);
+const Pair__ctor = funct (x : infer T, y : T) -> (x, y) as Pair(T);
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto p = Point(1, 0);
 	
 	// 编译器会生成下面的代码
@@ -218,10 +220,10 @@ const Option = data (Some infer T | Null);
 
 // 编译器会生成下面的代码
 @ctor
-const Some = func (const T : Type) -> struct (t : infer T);
+const Some = funct (const T : Type) -> struct (t : infer T);
 @ctor @eager
-const Null = func (const T : Type) -> struct ();
-const Option = func (const T : Type) -> Some[T] | Null;
+const Null = funct (const T : Type) -> struct ();
+const Option = funct (const T : Type) -> Some[T] | Null;
 \end{lstlisting}
 
 ADT 表达式中出现的全是没有出现的标识符，其中 \lstinline!Some! 和 \lstinline!Null! 都是标签类型，而 \lstinline!T! 是一个模版类型。
@@ -234,13 +236,13 @@ ADT 表达式中出现的全是没有出现的标识符，其中 \lstinline!Some
 本节中我们将介绍一种特殊的函数模版，它的实例化方式比较特殊。首先让我们看一个普通的函数模版：
 
 \begin{lstlisting}
-const add = func (x : T, y : T) -> x + y;
+const add = funct (x : T, y : T) -> x + y;
 \end{lstlisting}
 
 这里我们没有对 \lstinline!T! 做任何假设，但如果实例化时 \lstinline!T::+! 无定义，上面的函数在实例化时就会失败。这个检查是多次进行的，也即每次遇到一个 \lstinline!x + y! 时编译器都需要取搜索是否有函数 \lstinline!T::+! 并做出相应的反应。好消息是，我们有方法将这个结果“缓存”到一个地方。
 
 \begin{lstlisting}
-const add = func (x : T forall class { x : T; y : T; x + y; }, y : T) -> x + y;
+const add = funct (x : T forall class { x : T; y : T; x + y; }, y : T) -> x + y;
 \end{lstlisting}
 
 这里我们用到了\emph{类族提示符} \lstinline!forall! 和类族表达式。由于 \lstinline!forall! 是一个阐述关键字，我们可以用符号 \lstinline|:!| 来代替它。
@@ -258,7 +260,7 @@ auto SimplyWrong = class {
 	x * y;
 };					// 编译器不会做任何事（虽然它会将 () 标记为 False
 
-const main = func () -> do {
+const main = funct () -> do {
 	print SimplyWrong ();			// 输出 False
 	print SimplyWrong (Int, Int);	// 输出 False
 };
@@ -277,7 +279,7 @@ const Addable = class {
 此时我们可以通过类族提示符将其用在任何函数声明中：
 
 \begin{lstlisting}
-const add = func (x : T forall Addable) -> x + y;
+const add = funct (x : T forall Addable) -> x + y;
 \end{lstlisting}
 
 对比此前的代码可以看到我们只是将类族表达式声明为变量了而已。 \\
@@ -289,13 +291,13 @@ const Printable = class {
 	x : T;
 	print x;
 };
-const print_twice = func (x :! Printable, y :! Printable) -> do {
+const print_twice = funct (x :! Printable, y :! Printable) -> do {
 	print x;
 	print y;
 };
 \end{lstlisting}
 
-不过要注意上面这个例子对应的是 \lstinline!func (x, y) -> do { ... }! 的情形，因此 \lstinline!x! 和 \lstinline!y! 完全可以是不同类型的变量。如果要求两者的类型相同，可以先表明其中一个的类型所在的类族：
+不过要注意上面这个例子对应的是 \lstinline!funct (x, y) -> do { ... }! 的情形，因此 \lstinline!x! 和 \lstinline!y! 完全可以是不同类型的变量。如果要求两者的类型相同，可以先表明其中一个的类型所在的类族：
 
 \begin{lstlisting}
 const Addable = class { 
@@ -303,7 +305,7 @@ const Addable = class {
 	y : T;
 	x + y;
 };
-const add = func (x : T forall Printable, y : T) -> x + y;
+const add = funct (x : T forall Printable, y : T) -> x + y;
 \end{lstlisting}
 
 除了在函数参数中判断类族，我们也可以用内置运算符 \lstinline!hasclass! 来判断某个类型满足特定类族。
@@ -315,7 +317,7 @@ const Addable = class {
 	x + y;
 };
 
-const main = func () -> do {
+const main = funct () -> do {
 	print typeof(1) hasclass Addable;	// 输出 True
 	print String hasclass Addable;		// 输出 False
 };
@@ -383,7 +385,7 @@ const Convertible = class {
 	t <- f;
 };
 
-const f = func (x forall Convertible[To = T], y : T) -> do {
+const f = funct (x forall Convertible[To = T], y : T) -> do {
 	auto res = mut y;
 	scan b : Bool;
 	if (b) {

@@ -3,4 +3,6 @@
 *.out
 *.bcf
 *.xml
+*.gz
+*.toc
 **/.DS_Store

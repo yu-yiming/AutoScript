@@ -1,12 +1,21 @@
 \begin{introduction}
+	\item 函数表达式
+	\item 函数类型推断
+	\item 函数重载
     \item 函数重复定义
     \item \lstinline!guard! 表达式
+    \item \lstinline!match! 表达式
     \item 模式作用域
     \item \lstinline!this! 参数
     \item 修饰名字
     \item 函数运算符
     \item 默认参数
     \item 查询结构
+    \item 缺省提示符
+    \item 缺省调用
+    \item 函数中的变量存储期
+    \item 参数的传递方式
+    \item 捕获变量
 \end{introduction}
 
 
@@ -16,15 +25,15 @@
 
 \textbf{函数}是一段代码的\emph{模版}。通过\emph{函数调用}，用户可以将参数交给函数并执行这段代码。在 AutoScript 中，函数并没有被特别对待，我们可以通过\emph{函数表达式}来创建一个函数实体。
 
-\begin{grammar}[函数表达式 \texttt{[func-expr]}] \label{grm:function-expression}
+\begin{grammar}[函数表达式 \texttt{[funct-expr]}] \label{grm:function-expression}
     \lstinline![pattern] -> [expr]!
 \end{grammar}
 
-这里的 \lstinline![pattern]! 就是我们在上一章中介绍过的模式，它用来对函数调用进行模式匹配。在函数表达式中并不要求写出 \lstinline!func!，但在实际使用中，如果变量尚未提前声明，需要使用关键字 \lstinline!func! 来提示编译器这是一个函数。
+这里的 \lstinline![pattern]! 就是我们在上一章中介绍过的模式，它用来对函数调用进行模式匹配。我们此前提到过，在函数表达式中并不要求写出 \lstinline!funct!；但在实际使用中，如果变量尚未提前声明，需要使用关键字 \lstinline!funct! 来提示编译器这是一个函数。
 
 \begin{lstlisting}
-const main = func () -> do {
-    auto add = func (x : Int, y : Int) -> x + y;    // (x : Int, y : Int) 是一个元组模式
+const main = funct () -> do {
+    auto add = funct (x : Int, y : Int) -> x + y;	// (x : Int, y : Int) 是一个元组模式
     print add(1, 0);                                // 输出 1
 };
 \end{lstlisting}
@@ -32,7 +41,7 @@ const main = func () -> do {
 函数表达式的类型是由其参数类型和函数体类型决定的。本节中让我们暂时假设所有函数参数类型都是确定的（即在模式中显式给出变量类型），此时函数体的类型可以通过 \lstinline!do! 表达式的类型推断来得到。不过在一些情况下，这个推断会遇到问题：
 
 \begin{lstlisting}
-const fib = func (n : Int) -> do {
+const fib = funct (n : Int) -> do {
     if (n > 1) {
         return fib(n-1) + fib(n-2);     // 编译错误，fib 类型推断出现了循环引用
     }
@@ -40,7 +49,7 @@ const fib = func (n : Int) -> do {
 };
 \end{lstlisting}
 
-上面的函数体中，我们推断 \lstinline!fib! 的返回类型需要首先得知 \lstinline!fib(n-1)! 和 \lstinline!fib(n-2)! 的类型，这样就构成了循环引用。为了解决这个问题，要么将 \lstinline!if! 语句的判断条件反过来，要么就首先显式给出 \lstinline!fib! 的类型：
+上面的函数体中，我们推断 \lstinline!fib! 的返回类型需要首先得知 \lstinline!fib(n-1)! 和 \lstinline!fib(n-2)! 的类型 \footnote{这是因为函数表达式类型的推断依赖于第一个返回表达式的类型；其后的返回表达式除了判断类型外，都会尝试隐式转换为第一次推断出来的类型。}，这样就构成了循环引用。为了解决这个问题，要么将 \lstinline!if! 语句的判断条件反过来，要么就首先显式给出 \lstinline!fib! 的类型：
 
 \begin{lstlisting}
 const fib : Int -> Int = (n : Int) -> do {
@@ -51,14 +60,14 @@ const fib : Int -> Int = (n : Int) -> do {
 };
 \end{lstlisting}
 
-这样的声明方式也能让我们略去 \lstinline!func! 的使用，一举两得。
+这样的声明方式也能让我们略去 \lstinline!funct! 的使用，一举两得。
 
 \subsection{函数重载}
 
-AutoScript 中允许“重复定义”函数，只要它们满足提前声明的类别 \footnote{回忆\emph{类别}取决于类型中 \lstinline!->! 的个数} 且（如果显式给出类型限定符或可以通过初始化表达式推导时）和提前声明的类型不冲突，这也被称为\textbf{函数重载（Function Overloading）} \footnote{显然这和常见语言，如 C++ 中的重载定义不同。后者的函数重载灵活性更大，基本不对同名函数的参数类型作任何限制，但也带来了复杂的\emph{重载决议}。}。在函数调用时，会以声明顺序依次尝试匹配。
+AutoScript 中允许“重复定义”函数，只要它们满足提前声明的类别 \footnote{回忆\emph{类别}取决于类型中 \lstinline!->! 的个数} 且（如果显式给出类型限定符或可以通过初始化表达式推导时）和提前声明的类型不冲突，这也被称为\textbf{函数重载（Function Overloading）} \footnote{显然这和常见语言，如 C++ 中的重载定义不同。后者的函数重载灵活性更大，基本不对同名函数的参数类型作任何限制，但也带来了复杂的\emph{重载决议}。AutoScript 极力避免在链接过程中额外的困难，因此决定摒弃任意的函数重载。}。在函数调用时，会以声明顺序依次尝试匹配。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     auto f : (Int, Int) -> String;
     auto f = (x ? 42, y) -> "x is 42";
     auto f = (x, y ? 42) -> "y is 42";
@@ -75,7 +84,7 @@ const main = func () -> do {
 
 \begin{lstlisting}
 const Point = struct (x : Real, y : Real);
-const print_point = func (p : ref mut? Point) -> print "The point is $(p)";
+const print_point = funct (p : ref mut? Point) -> print "The point is $(p)";
 const set_point : (ref mut? Point, x : Real, y : Real) -> ();
 const set_point = (p : ref mut Point, x : Real, y : Real) -> do {
 	p.x <- x;
@@ -91,13 +100,13 @@ const set_point = (p : ref mut Point, x, y) -> print "The point is immutable";
 重复定义的函数显得非常冗余，因为其中的大部分内容是相同的（也就是 \lstinline!auto f! 的部分），因此更流行的做法是使用 \lstinline!guard! 表达式。
 
 \begin{grammar}[\texttt{guard} 表达式]
-	\lstinline!guard! \texttt{[func-expr-list]}
+	\lstinline!guard! \texttt{[funct-expr-list]}
 \end{grammar}
 
-它的本质是 \lstinline!match! 表达式的语法糖：\texttt{guard [func-expr-list]} 会被编译器理解为 \texttt{func (args) -> match (args) [func-expr-list]}。
+它的本质是 \lstinline!match! 表达式的语法糖：\texttt{guard [funct-expr-list]} 会被编译器理解为 \texttt{funct (args) -> match (args) [funct-expr-list]}。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     auto f : (Int, Int) -> String = guard
         (x ? 42, y ? 42) -> "Both are 42",
         (x ? 42, y) -> "x is 42",
@@ -106,16 +115,16 @@ const main = func () -> do {
 };
 \end{lstlisting}
 
-上面用到的 \lstinline!otherwise! 是一个特殊的关键字，它可以匹配任意的实体，因此可以作为默认的匹配情况。这里值得详细介绍 \lstinline!match! 表达式和 \lstinline!guard! 表达式的语法：
+上面用到的 \lstinline!otherwise! 是一个特殊的关键字，它可以匹配任意的实体，因此可以作为默认的匹配情况。这里值得一并介绍 \lstinline!match! 表达式的语法：
 
 \begin{grammar}[\texttt{match} 表达式] \label{grm:match-expression}
-    \lstinline!match! \texttt{([expr])} \texttt{[func-expr]} \lstinline!,! ... \lstinline!,! \texttt{[func-expr]}
+    \lstinline!match! \texttt{([expr])} \texttt{[funct-expr]} \lstinline!,! ... \lstinline!,! \texttt{[funct-expr]}
 \end{grammar}
 
 因此，\lstinline!match! 表达式本质是一系列函数的罗列，它们的参数拥有相同的类型，在给出实际的表达式时，编译器会尝试找到一个最好的匹配。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     scan x : Int;
     print match (x)
         (? 42) -> "Good",
@@ -131,12 +140,14 @@ const main = func () -> do {
 
 可以看到在 \lstinline!match! 语句中出现的函数表达式，我们省略了参数的名字，其原因我们上一章已经提到了：模式声明中\emph{不一定}引入变量，因此变量名完全可以省略。 \\
 
-\lstinline!match! 表达式要求其中的每个函数都有相同的返回类型（这样才能确保 \lstinline!match! 表达式拥有确定的返回类型）。如果想让 \lstinline!match! 表达式拥有选择类型，可以在 \lstinline!match ([expr])! 中使用 \lstinline!@choice! 属性。
+\lstinline!match! 表达式要求其中的每个函数都有相同的返回类型（这样才能确保 \lstinline!match! 表达式拥有确定的返回类型）。如果想让 \lstinline!match! 表达式拥有选择类型，可以在 \lstinline!match ([expr])! 语句中使用 \lstinline!choice! 关键字。
+
+\pagebreak
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     scan x : Int;
-    auto res =  @choice match (x)
+    auto res =  match (x) choice
         (? 42) -> "Good",
         otherwise -> 42;
     print typeof(res);      // 输出 Int | String
@@ -146,16 +157,42 @@ const main = func () -> do {
 此时，编译器会在 \lstinline!match! 表达式周围套上一个 \lstinline!do! 表达式。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	scan x : Int;
 	// 编译器会将上个示例转换为下面的代码
-	auto res = @choice do {
+	auto res = do choice {
 		match (x)
 			(? 42) -> return "Good",
 			otherwise -> return 42;
 	};
 };
 \end{lstlisting}
+
+不过很多情况下，\lstinline!match! 语句中不同函数表达式返回类型不同是因为特定情况下，我们希望使用跳转语句。此时比起使用 \lstinline!choice! 语句使得整个表达式拥有选择类型，不如利用 \lstinline!noreturn! 关键字告知编译器这个函数表达式没有返回类型。
+
+\begin{lstlisting}
+const main = funct () -> do @name(body) {
+    scan x : Int;
+    auto x = match (x) choice
+        (? 42) -> x,
+        otherwise -> do {
+            continue body;
+        };
+   print typeof(x);			// 输出 Int | Void
+   
+   scan y : Int;
+   auto y = match (y)
+       (? 42) -> y,
+       otherwise -> do noreturn {
+           continue body;
+       };
+   print typeof(x);			// 输出 Int
+};
+\end{lstlisting}
+
+得知函数表达式没有返回类型后，编译器就不会将其作为所在作用域中的类型推断参考，因此上面 \lstinline!match! 语句的类型不存在冲突。 \\
+
+有关模式匹配，我们会在 AutoScript 的高级特性中进一步介绍。
 
 
 
@@ -166,8 +203,8 @@ const main = func () -> do {
 AutoScript 中有一个特殊的函数调用语法 \lstinline!a.f(...args)!。通常，这样的函数在声明时都指定了唯一的一个 \lstinline!this! 参数：
 
 \begin{lstlisting}
-const prepend = func (s : String, this t : String) -> s ++ t;
-const main = func () -> do {
+const prepend = funct (s : String, this t : String) -> s ++ t;
+const main = funct () -> do {
     print "world!".prepend("Hello, ");  // 输出 Hello, world!
 };
 \end{lstlisting}
@@ -175,23 +212,23 @@ const main = func () -> do {
 参数中存在 \lstinline!this! 修饰的函数（称为\emph{成员函数}）会被编译器进行特殊处理。
 
 \begin{lstlisting}
-const prepend = func (s : String, this t : String) -> s ++ t;
+const prepend = funct (s : String, this t : String) -> s ++ t;
 
 // 编译器会生成下面的代码
-const ::String::prepend = func (s : String, t : String) -> s ++ t;
+const ::String::prepend = funct (t : String) -> funct (s : String) -> s ++ t;
 
-const main = func () -> do {
+const main = funct () -> do {
     print "world".prepend("Hello, ");
 
     // 编译器会生成下面的代码
-    print ::String::prepend("Hello, ", "world");
+    print ::String::prepend("world")("Hello, ");
 };
 \end{lstlisting}
 
 上面例子中出现的 \lstinline!::! 运算符称为\textbf{域连接符（Scope Connective）} 。它本质上是为了区分名字的特殊符号，将其看作名字的一部分即可 \footnote{如果观察 \lstinline!::! 的用法，就会发现它并不符合 AutoScript 中对运算符的定义：我们可以将其用在表达式的开头。}。实际上，所有的变量真正的名字都是类似的。以 \lstinline!main! 函数为例，其真正的名字是 \lstinline!::main!。像这样带有 \lstinline!::! 的名字被称为\textbf{修饰名字（Qualified Name）}。
 
 \begin{lstlisting}
-const main = func () -> do @name(body) {
+const main = funct () -> do @name(body) {
     auto x = 42;        // 修饰名字是 ::main::body::x
     @name(inner) {
         auto x = 24;    // 修饰名字是 ::main::body::inner::x
@@ -201,34 +238,34 @@ const main = func () -> do @name(body) {
 };
 \end{lstlisting}
 
-可以看到，修饰名字中的每个部分来源于 AutoScript 中的作用域名字 \footnote{注意到函数的作用域和其函数体（\lstinline!do! 表达式）的作用域并非同一个作用域。}。如果我们没有为作用域取名，我们就没法使用修饰名字来访问变量了。如果使用未修饰名字，则需要遵守变量覆盖的规律。 \\
-
-值得讨论的是，编译器在调用处如何知道将 \lstinline|"world!"| 塞到哪里呢？实际上对于所有成员函数，都带有一个编译期的属性，\lstinline!this! 位移：它代表 \lstinline!this! 在函数中的位置。因此在声明一个成员函数时，编译器会存下这个属性，随后在用点调用语法时通过这个函数的 \lstinline!this! 位移在合适的位置放入参数。 \\
-
-有关模式匹配，我们会在 AutoScript 的高级特性中进一步介绍。
+可以看到，修饰名字中的每个部分来源于 AutoScript 中的作用域名字 \footnote{注意到函数的作用域和其函数体（\lstinline!do! 表达式）的作用域并非同一个作用域。}。如果我们没有为作用域取名，我们就没法使用修饰名字来访问变量了。如果使用未修饰名字，则需要遵守变量覆盖的规律。 
 
 \subsection{按返回值运算符}
 
-AutoScript 相同参数的函数之间可以使用任意的运算符。此时编译器会生成一个按返回值运算的函数。
+AutoScript 相同参数的函数之间可以使用大多数运算符。此时编译器会生成一个按返回值运算的函数。
 
 \begin{lstlisting}
-const inc = func (x : Int) -> x + 1;
-const dec = func (x : Int) -> x - 1;
+const inc = funct (x : Int) -> x + 1;
+const dec = funct (x : Int) -> x - 1;
 const sqrm1 = inc * dec;
 
 // 上面的函数与下面的等价
-const sqrm1 = func (x : Int) -> inc(x) * dec(x);
+const sqrm1 = funct (x : Int) -> inc(x) * dec(x);
 \end{lstlisting}
+
+排除在外的有调用运算符，如 \lstinline!f g! 还是会正常地处理为将 \lstinline!g! 作为参数传到 \lstinline!f! 中，以及点调用运算符，如 \lstinline!f.g! 还是会尝试找到 \lstinline!g! 的修饰名字，随后将 \lstinline!f! 作为参数传入。 
+
+\subsection{复合运算符}
 
 最后，我们可以用 \lstinline!<<! 运算符来进行函数复合。如果函数 \lstinline!f! 的返回类型可以隐式类型转换为 \lstinline!g! 的参数类型，则可以用 \lstinline!g << f! 来表示两个函数的复合。
 
 \begin{lstlisting}
-const inc = func (x : Int) -> x + 1;
-const dec = func (x : Int) -> x - 1;
+const inc = funct (x : Int) -> x + 1;
+const dec = funct (x : Int) -> x - 1;
 const id = inc << dec;
 
 // 上面的函数与下面的等价
-const id = func (x : Int) -> inc(dec(x));
+const id = funct (x : Int) -> inc(dec(x));
 \end{lstlisting}
 
 类似地还有另一个方向的复合运算符 \lstinline!>>!。
@@ -237,46 +274,163 @@ const id = func (x : Int) -> inc(dec(x));
 const id = dec >> inc;
 \end{lstlisting}
 
-后面我们会学到，这些函数上的运算符是可以定义出来的。
+\subsection{管道运算符}
+
+除了默认的函数调用 \lstinline!f x!，我们可以使用管道运算符 \lstinline!|>! 将参数前置。
+
+\begin{lstlisting}
+auto f = funct (x : Int) -> x;
+auto g = funct (x : Int) -> x;
+
+const main = funct () -> do {
+    print 42 |> f |> g;			// 输出 42
+}
+\end{lstlisting}
+
+这也是对调用运算符没有显示形式的一种补偿。
+
+\subsection{运算符组}
+
+AutoScript 中，运算符的部分应用比较常用：
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+    auto inc = funct (x : Int) -> x + 1
+	auto arr = (1, 2, 3);
+	print arr.map(inc);					// 输出 2, 3 ,4
+};
+\end{lstlisting}
+\end{minipage}
+
+不过无论是在行内写出这么长一个函数，还是提前声明都显得有些笨拙。因此，AutoScript 引入了\textbf{运算符组（Operator Section）}的概念，我们可以通过语法糖迅速构建一个函数：
+
+\begin{grammar}[运算符组] \label{grm:operator-section}
+\begin{enumerate}
+	\item \texttt{([operator] [atom-expr])}
+	\item \texttt{([atom-expr] [operator])}
+\end{enumerate}
+\end{grammar}
+
+当运算符和原子表达式（变量或字面量）一并使用并加上圆括号时，编译器会将其视作一次部分调用，分别绑定运算符第一个参数和第二个参数。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+    auto arr = (1, 2, 3);
+    print arr.map(+ 1);					// 输出 2, 3, 4
+    
+    // 编译器会生成下面的代码：
+    print arr.map(funct x -> x + 1);
+};
+\end{lstlisting}
+\end{minipage}
+
+这里生成的函数没有给出参数的类型，因此是一个函数模版，可以接纳任何类型的参数。 \\
+
+所有运算符中，函数调用是最为特殊的（它没有对应的符号）；如果想在运算符组中使用它，可以使用管道运算符代替。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+    auto fs = ((+ 1), (* 2), (/ 3));
+    print fs.map(3 |>);					// 输出 4, 6, 1
+};
+\end{lstlisting}
+\end{minipage}
+
+运算符组和函数复合运算符结合使用，可以简化很多函数定义：
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+    auto arr = (1, 2, 3, 4, 5);
+    print arr.filter((/ 2) >> (== 0));	// 输出 2, 4
+};
+\end{lstlisting}
+\end{minipage}
+
+
+\subsection{调用序列}
+
+对于一些使用相同模式的运算符调用链，我们可以利用\textbf{调用序列（Call Chain）}来简化形式。调用序列使用 \lstinline!call! 关键字。
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+    print call (+) 1 2 3 4 5;						// 输出 15
+    auto f = call (>>) (+ 1) (* 2) (/ 3) (- 4);
+    print f(0);										// 输出 -4
+};
+\end{lstlisting}
+\end{minipage}
+
+甚至，我们可以用它来改写函数表达式：
+
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
+\begin{lstlisting}
+const main = funct () -> do {
+    auto curry_add : Int -> Int -> Int = call (->) x y (x + y);
+};
+\end{lstlisting}
+\end{minipage}
+
+从这里也可以印证 \lstinline!->! 本身是一个表达式。
 
 \section{函数参数}
 
 \subsection{输出参数}
 
-可以为参数使用 \lstinline!@out! 属性来表示这是一个输出参数。输出参数的类型必须是一个可变引用类型，它可以让调用处原地声明一个变量（类似于 \lstinline!scan! 的常见用法）：
+可以为参数使用 \lstinline!@out! 属性来表示这是一个输出参数。输出参数的类型必须是一个可变引用类型，它可以让调用处原地声明一个变量（类似于 \lstinline!scan! 的常见用法）。作为输出参数传入的变量\emph{不必}是可变类型：可以将整个函数视作这个变量的初始化过程。
 
 \begin{lstlisting}
-const bind_value = func (@out x : ref mut Int, x_val : Int) -> x <- x_val;
+const bind_value = funct (@out x : ref mut Int, x_val : Int) -> x <- x_val;
 
-const main = func () -> do {
+const main = funct () -> do {
 	print bind_value(x : Int, 42);	// 输出 42
 	print x							// 输出 42
 };
 \end{lstlisting}
 
-这样的语法在一些情况下可以简化语句。除了自动存储期的变量外，我们也可以用 \lstinline!@out! 来初始化静态存储期的变量：
+这样的语法在一些情况下可以简化语句。\lstinline!@out! 也可以用来初始化静态存储期的变量（线程存储期同理）：
 
 \begin{lstlisting}
-const foo = func () -> do {
-    scan static x : mut Int;		// 初次构建时会使用这个语句
-    return ref x;
+const foo = funct (@out x : ref mut Int) -> do {
+    x <- 42;
 };
 
-const main = func () -> do {
-    auto r = foo();					// 假设此时输入 42
-    r <- r + 1;
-    print foo();					// 输出 43
+const bar = funct () -> do {
+    foo(static x : mut Int);		// 仅在初始化 x 时调用 foo，此后会跳过
 };
 \end{lstlisting}
 
-注意到这里静态存储期变量拥有和常规变量声明相同的特征：它的初始化语句只会在第一次遇到时执行。
+注意到这里静态存储期变量拥有和常规变量声明相同的特征：它的初始化语句只会在第一次遇到时执行。 \\
+
+常量存储期的变量也可以通过这种方式初始化，但其要求函数是可以编译期求值的。
+
+\begin{lstlisting}
+const good = funct () -> 42;
+const bad = funct () -> do {
+    scan x : Int;
+    return x;
+};
+
+good(const x : Int);
+bad(const y : Int);			// 编译错误，bad 无法在编译期求值
+\end{lstlisting}
 
 \subsection{查询结构}
 
-AutoScript 通常不允许函数调用时参数和声明的类型不同，不过我们有特殊的方式来实现\emph{默认参数}。首先让我们介绍\emph{查询结构}。AutoScript 中用方括号来创建一个查询结构。
+AutoScript 通常不允许函数调用时参数和声明的类型不同，不过我们有特殊的方式来实现\emph{默认参数}。首先让我们介绍\textbf{查询结构（Query Structure）}。AutoScript 中用方括号来创建一个查询结构。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     auto q0 = [0];      // 一个查询 0 的结构
     auto q1 = [x = 2];  // 一个查询 x = 2 的结构
 };
@@ -288,7 +442,7 @@ const main = func () -> do {
     \item 合并操作。可以用 \lstinline!+! 运算符来合并两个查询结构，此时不允许两者中的键出现重复。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     auto q0 = [x = 0];
     auto q1 = [y = 1];
     print q0 + q1;      // 输出 [x = 0, y = 1]
@@ -298,7 +452,7 @@ const main = func () -> do {
     \item 差集操作。可以用 \lstinline!-! 运算符来将一个查询结构中，另一个查询结构中出现的键都删除。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     auto q0 = [x = 0, y = 1];
     auto q1 = [y = 42];
     print q0 - q1;      // 输出 [x = 0]
@@ -308,7 +462,7 @@ const main = func () -> do {
     \item 成员访问操作。可以用 \lstinline!.! 运算符来调取查询结构中某个键对应的值。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
     auto q = [x = 0, y = 1];
     print q.x;          // 输出 0
 };
@@ -322,9 +476,9 @@ const main = func () -> do {
 我们可以将查询结构传给函数，编译器会在编译期为我们将参数准备好。
 
 \begin{lstlisting}
-const add = func (x : Int, y : Int) -> x + y;
+const add = funct (x : Int, y : Int) -> x + y;
 
-const main = func () -> do {
+const main = funct () -> do {
     print add [y = 42, x = 24];     // 编译器会将其转变成 add(24, 42)
 };
 \end{lstlisting}
@@ -336,12 +490,12 @@ const main = func () -> do {
 \end{grammar}
 
 \begin{lstlisting}
-const iterate = func (n : Int ?? 5) -> do {
+const iterate = funct (n ?? 5 : Int) -> do {
     for (i from range[n]) {
         print i;
     }
 };
-const main = func () -> do {
+const main = funct () -> do {
     iterate(3);         // 输出 0, 1, 2
     iterate[];          // 输出 0, 1, 2, 3, 4
 };
@@ -350,24 +504,24 @@ const main = func () -> do {
 表达式中允许出现已经被声明的函数参数。
 
 \begin{lstlisting}
-const pair = func (x : Int, y : Int ?? x) -> (x, y);
+const pair = funct (x : Int, y ?? x : Int) -> (x, y);
 \end{lstlisting}
 
 正如在变量定义语句中函数的参数类型可以通过初始化表达式的类型来推断一样，缺省提示符后的表达式可以用来推断函数参数类型，因此上面的函数或许可以写成：
 
 \begin{lstlisting}
-const pair = func (x : Int, y ?? x) -> (x, y);
+const pair = funct (x : Int, y ?? x) -> (x, y);
 \end{lstlisting}
 
-不过两个实现是不同的：仅当 \lstinline!y! 缺省时两者才都是调用了使用两个 \lstinline!Int! 类型参数的函数。否则前者只是一个普通函数，而后者是一个函数模版 \footnote{我们会在后面学到模版的概念，这里可以简单理解为，\lstinline!y! 的地方可以填入任意类型的参数。}。 \\
+不过两个实现是不同的：仅当 \lstinline!y! 缺省时两者才都是调用了使用两个 \lstinline!Int! 类型参数的函数。否则前者只是一个普通函数，而后者是一个函数模版 \footnote{我们会在后面学到模版的概念，这里可以简单理解为，\lstinline!y! 的地方原本可以填入任意类型的参数，而只在缺省时才一定会推断为 \lstinline!Int! 类型。}。 \\
 
 默认参数不能是 \lstinline!this!，这会导致编译期错误 \footnote{确实，点调用符不能接受 \lstinline!this! 是 \lstinline!undefined!，编译器将无法确定函数所在的名字空间。}。 \\
 
 函数中参数的名称并不是必要的，当省略参数名称时，我们可以通过\emph{参数占位符}来为其赋值。
 
 \begin{lstlisting}
-const secret = func (: Int) -> 42;
-const main = func () -> do {
+const secret = funct (: Int) -> 42;
+const main = funct () -> do {
 	print secret [$0 = 24];		// 输出 42
 };
 \end{lstlisting}
@@ -377,9 +531,9 @@ const main = func () -> do {
 对于利用重载（或 \lstinline!guard! 语句）的函数，查询结构只能应用于它的原型；此时因为函数并不拥有参数名称，因此我们只能利用参数占位符。这并不意味着模式匹配机制和查询结构不兼容 \footnote{实际上，最常见的参数列表是一个\emph{元组模式声明}，它也用到了模式匹配，我们会在后面的章节中详细介绍。}，单纯只是\emph{重载}和查询结构不兼容，编译器难以判断函数使用的是哪一个重载。
 
 \begin{lstlisting}
-const f = func (x : Int, ? 42) -> x;
-const f = func (? 42, y : Int) -> y;
-const main = func () -> do {
+const f = funct (x : Int, ? 42) -> x;
+const f = funct (? 42, y : Int) -> y;
+const main = funct () -> do {
 	f[x = 42, y = 24];		// 编译错误，经重载的函数没有参数名称。
 	f[$0 = 42, $1 = 42];
 };
@@ -388,18 +542,18 @@ const main = func () -> do {
 最后，我们值得说明缺省提示符 \lstinline!??! 在其它地方的运用：
 
 \begin{lstlisting}
-const main = func () -> do {
-	scan x : Int ?? 42;		// 若输入了一个非法数字，则 x 初始化为 42
+const main = funct () -> do {
+	scan x ?? 42 : Int;		// 若输入了一个非法数字，则 x 初始化为 42
 	scan y : Int;
 	auto z = y ?? 42;		// 若 y 是 undefined，则 z 初始化为 42
-	auto w ?? 42 = y;		// 若 y 是 undefined，则 z 初始化为 42
+	auto w ?? 42 = y;		// 若 y 是 undefined，则 w 初始化为 42
 };
 \end{lstlisting}
 
 可以看到，变量声明中，\lstinline!??! 也可以用于声明缺省时的初始化表达式。不仅如此，所有的表达式都可以和 \lstinline!??! 联动：
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	scan x : Int;
 	print x ?? 42;				// 若 x 是 undefined，则输出 42
 	print f ?? eat (1, 2, 3);	// 若 f 是 undefined，则不调用（但这里会输出 ()）
@@ -411,48 +565,50 @@ const main = func () -> do {
 这里涉及到一个有趣的问题，对于 \lstinline!a ?? b!，编译器对两个操作数类型的要求是什么呢？通常来说，当然应该要求两者的类型完全相同，或依照其中一个的类型来推断表达式类型。不过这里涉及到了 AutoScript 中\emph{整表达式类型推断}的机制。在 \lstinline!??! 中，编译器仅要求整个表达式的类型在不同选择下兼容即可，并选择其中的窄类型。
 
 \begin{lstlisting}
-const f = func (x : Int, y : Real ?? 42) -> x;	// 类型是 (Int, Real) -> Int
-const g = func (x : Int) -> x;					// 类型是 Int -> Int
+const f = funct (x : Int, y : Real ?? 42) -> x;	// 类型是 (Int, Real) -> Int
+const g = funct (x : Int) -> x;					// 类型是 Int -> Int
 
-const main = func () -> do {
+const main = funct () -> do {
 	print (f ?? g) 0;			// 没问题，这个表达式的类型一定是 Int
 };
 \end{lstlisting}
 
 
-\subsection{缺省调用}
+\subsection{缺省属性}
 
-AutoScript 中有一个和缺省符号类似的符号 \lstinline!??.!，即缺省调用符，它是 \lstinline!if! 语句的语法糖。
+函数参数上可以用 \lstinline!@default! 设置缺省属性，这样在函数传递时，可以通过 \lstinline!default! 来构建特定的默认值。
 
+\begin{minipage}[c]{0.95\textwidth}
+\vspace{1.0em}
 \begin{lstlisting}
-const Pair = struct (
-    x : Int,
-    y : Int
-);
+const f = funct (@default(42) x : Int) -> x;
 
 const main = func () -> do {
-    auto p : Pair = undefined;
-    print p??.x;				// 输出 ()
-    
-    // 上面的语句和下面等同：
-    if (p) {
-        print p.x;
-    }
-    else {
-        print ();
-    }
+    print f(0);				// 输出 0
+    print f(default);		// 输出 42
 };
 \end{lstlisting}
+\end{minipage}
 
+实际上，函数参数上 \lstinline!@default! 属性的运用可以延伸到普通的变量声明上，只不过其意义并不大。
+
+\begin{lstlisting}
+@default(42)
+auto x : Int;
+
+auto x = default;			// 初始化为 42
+\end{lstlisting}
+
+需要注意的是，变量的多次声明中 \lstinline!@default! 只能出现一次，且其中的表达式必须能被立刻求值 \footnote{出现一次是为了防止其依赖于某个不纯洁的表达式导致歧义；同时立刻求值也可以防止生命周期的问题。}。
 
 \section{函数中的变量}
 
 \subsection{函数作用域和静态变量}
 
-函数中出现的变量是指被名字空间限定在当前函数的变量，包括参数、\lstinline!do! 表达式中或 \lstinline!where! 子句中声明的变量等。如果使用 \lstinline!auto! 存储限定符（或缺省该限定符，此时会默认为 \lstinline!auto!），则会在被定义的作用域结束时释放内存。特别地，参数列表中的自动存储变量，其作用域是特别的\emph{函数作用域}，其开始于参数声明，结束于函数表达式结尾 \footnote{注意到函数作用域并没有用大括号表示}。
+函数中出现的变量是指被名字空间限定在当前函数的变量，包括参数、\lstinline!do! 表达式中或 \lstinline!where! 子句中声明的变量等。如果使用 \lstinline!auto! 存储限定符（或缺省该限定符，此时会默认为 \lstinline!auto!），则会在被定义的作用域结束时释放内存。特别地，参数列表中的自动存储变量，其作用域是特别的\emph{函数作用域}，其开始于参数声明，结束于函数表达式结尾 \footnote{注意到函数作用域并没有用大括号表示，这是一个特例。}。
 
 \begin{lstlisting}
-const f = func (x : Int) -> do {
+const f = funct (x : Int) -> do {
 	auto y = 42;
 	print x + y;
 } + do {				// 第一个 do 表达式的作用域到此为止
@@ -464,13 +620,13 @@ const f = func (x : Int) -> do {
 有时，我们需要函数中存储一些和上下文有关的状态，此时静态存储期的变量会有很大帮助：
 
 \begin{lstlisting}
-const record = func (x : Int) -> do {
-	static vec : mut Vec[Int] = default;
+const record = funct (x : Int) -> do {
+	static vec : mut Vector[Int] = default;
 	vec.push_back(x);
 	return ref vec;
 };
 
-const main = func () -> do {
+const main = funct () -> do {
 	auto vec : ref mut Vec[Int] = default;
 	for (i from range(10)) {
 		vec = record(i * i);
@@ -486,13 +642,13 @@ const main = func () -> do {
 我们已经见到过各种类型的参数了，有作为值传递的（如 \lstinline!Int!），有作为引用传递的（如 \lstinline!ref String!），还有作为可变引用传递的（如 \lstinline!ref mut String!），它们的意义我们已经非常了解了：由于函数参数和变量定义是等价的，因此在函数作用域中会按照参数声明构建一个特定类型的对象。因此，当参数通过值传递时，新的变量和调用处的变量不再有任何关系；反之如果用引用传递，新的变量虽然也是调用处变量的拷贝，但它们的值都是同一个对象的引用。
 
 \begin{lstlisting}
-const f = func (x : Int) -> do {
+const f = funct (x : Int) -> do {
 	x <- 42;			// 这里的 x 是值类型
 };
-const g = func (x : ref mut Int) -> do {
+const g = funct (x : ref mut Int) -> do {
 	x <- 42;			// 这里的 x 是引用类型
 };
-const main = func () -> do {
+const main = funct () -> do {
 	auto x = mut 0;
 	f(x);				// x 没有被修改，因为 f 中的 x 和 main 中的 x 仅仅是值相同
 	g(ref x);			// x 被修改为 42，因为 g 中的 x 初始化为 x 的引用
@@ -504,11 +660,11 @@ const main = func () -> do {
 类似地，返回值也可以通过值或引用传递。不过除了上一段所论述的，函数返回值会面临对象生命周期的顾虑。
 
 \begin{lstlisting}
-const f = func (x : Int) -> do {
+const f = funct (x : Int) -> do {
 	return ref x;				// 编译错误，返回了自动存储期变量的引用
 };
 
-const main = func () -> do {
+const main = funct () -> do {
 	print deref(f());			// （如果代码通过编译）非法的内存访问！f 中的 x 已经被释放了
 };
 \end{lstlisting}
@@ -516,7 +672,7 @@ const main = func () -> do {
 因此，编译器不允许返回自动存储期变量的引用，这也是为了程序安全的设计。下一节中我们会见到，AutoScript 也禁止了任何间接返回局部引用的行为。不过，如果函数参数本身的类型就是引用类型，编译器不会阻止其作为返回值返回；这种类型的参数经常会作为多返回值的实现方式。
 
 \begin{lstlisting}
-const random_max = func (@out first : ref Int, @out second : ref Int) -> do {
+const random_max = funct (@out first : ref Int, @out second : ref Int) -> do {
 	first <- Random.int(0, 100);
 	second <- Random.int(0, 100);
 	if (first < second) {
@@ -527,7 +683,7 @@ const random_max = func (@out first : ref Int, @out second : ref Int) -> do {
 	}
 };
 
-const main = func () -> do {
+const main = funct () -> do {
     auto max = random_max(x : Int, y : Int);
     print "The max of $(x) and $(y) is $(max)";
 };
@@ -539,31 +695,33 @@ const main = func () -> do {
 函数中可以出现外部作用域中的变量，此时它们相当于通过值传递被\textbf{捕获（Capture）}到函数体当中，此时相当于在函数体中创建了一个变量，它初始化为这个被捕获变量的值。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto x = 42;
-	auto f = func (y : Int) -> x + y;	// x 是被自动捕获的变量
+	auto f = funct (y : Int) -> x + y;	// x 是被自动捕获的变量
 };
 \end{lstlisting}
 
 不过，被捕获变量总是不可变的，且无法自动捕获任何引用类型的变量。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto x = 42;
+	auto y = mut 42;
 	auto r = ref x;
-	auto f = func () -> x <- 24;	// 编译错误，x 不可变
-	auto g = func () -> r;			// 编译错误，r 不能被自动捕获
+	auto f = funct () -> x <- 24;	// 编译错误，x 不可变
+	auto g = funct () -> y <- 24;	// 编译错误，y 不可变
+	auto g = funct () -> r;			// 编译错误，r 不能被自动捕获
 };
 \end{lstlisting}
 
 不允许默认捕获引用类型变量有两个主要的原因：其一，引用目标的生命周期可能短于函数的生命周期（看下面的例子）；其二，可以通过引用改变函数外部的环境，这会损害函数的\emph{纯洁性}，即是否在相同参数调用下有相同行为 \footnote{当然，这只是一个语法盐而已，类似于默认所有变量不可变，函数也应该默认是纯的；如果想使用不纯的函数，应该显式使用 \lstinline!static! 变量或下面介绍的 \lstinline!@capture! 属性。}。
 
 \begin{lstlisting}
-const f = func (x : Int) -> do {
+const f = funct (x : Int) -> do {
 	auto r = ref x;
-	return func () -> r;	// 编译错误，r 不能被自动捕获
+	return funct () -> r;	// 编译错误，r 不能被自动捕获
 };
-const main = func () -> do {
+const main = funct () -> do {
 	auto r = f(42);			// 如果允许自动捕获引用，这里相当于得到了 f 中 x 的引用
 	print r;				// 引用目标已经被释放了，这里是一个非法的内存访问
 };
@@ -572,28 +730,28 @@ const main = func () -> do {
 为了捕获变量的引用，可以使用 \lstinline!@capture! 属性配合查询结构来实现。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	static s = "Hello, world!";
-	auto f = func @capture[r = ref s] () -> r;
+	auto f = funct @capture[r = ref s] () -> r;
 };
 \end{lstlisting}
 
 \lstinline!@capture! 的原理类似于将引用装箱到一个临时的复合类型中，然后将这个复合对象值捕获。如果要手写实现这个功能会麻烦许多，但让我们作一个简单的展示：
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	static s = "Hello, world";
 	auto wrapped_s : struct (r : ref String) = ref s;
-	auto f = func () -> wrapped_s.r;
+	auto f = funct () -> wrapped_s.r;
 };
 \end{lstlisting}
 
 注意到我们在示例中将 \lstinline!s! 声明为 \lstinline!static!。这也是 \lstinline!@capture! 对引用类型的一个额外要求：被引用的变量必须不是自动存储期的。不过有时，我们希望将局部作用域中的变量\emph{移动}到函数作用域中，此时可以使用 \lstinline!move! 提示符，它的作用类似于 \lstinline!with! 子句，不过目标是一个函数作用域。
 
 \begin{lstlisting}
-const main = func () -> do {
+const main = funct () -> do {
 	auto s = "Hello, world";
-	auto f = func @capture[r = ref move s] () -> r;
+	auto f = funct @capture[r = ref move s] () -> r;
 };
 \end{lstlisting}
 

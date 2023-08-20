@@ -29,11 +29,11 @@
     },
     keywordstyle        = [1]{\color{blue}},
     morekeywords        = [1]{
-        addrof, and, as, bitand, bitnot, bitor, decay, decayof, deref, derefof, exceptof, hasbase, hasclass, in, instof, keyof, kindof, nameof, next, not, of, or, protoof, sizeof, shl, shr, tagof, templof, typeof, union, xor,
+        addrof, and, as, bitand, bitnot, bitor, call, deatom, decay, dedyn, decayof, demut, deref, derefof, errorof, exceptof, hasbase, hasclass, in, instof, keyof, kindof, nameof, next, not, of, or, protoof, sizeof, shl, shr, tagof, templof, typeof, union, xor,
     },
     keywordstyle        = [2]{\color{purple}},
     morekeywords        = [2]{
-        alias, auto, class, const, data, equals, forall, from, func, is, new, object, static, struct, thread, type
+        alias, auto, class, const, data, equals, forall, from, funct, is, new, object, static, struct, thread, type
     },
     keywordstyle        = [3]{\color{codeviolet}},
     morekeywords        = [3]{
@@ -42,7 +42,7 @@
     },
     keywordstyle        = [4]{\color{gray}},
     morekeywords        = [4]{
-        branch, excluding, including, intrinsic, iteration, loop,
+        again, branch, choice, error, excluding, including, intrinsic, iteration, loop, noreturn, value
     },
     keywordsprefix      = @,
     comment             = [l]{//},
@@ -69,6 +69,11 @@
     {9}{{{\color{codeviolet}9}}}1
 }
 
+
+\lstset{
+	float,
+	floatplacement=H
+}
 
 \lstset{identifierstyle=\idstyle}
 
@@ -112,7 +117,7 @@
 %     morestring=[b]',
 %     morecomment=[l]//,
 % }
-
+	
 
 \begin{document}
 \maketitle
@@ -143,39 +148,40 @@
 \chapter{抽象数据类型与模式匹配}
 \input{Contents/Abstract Data Types and Pattern Matching}
 
-\part{AutoScript 标准库}
-
-\chapter{Prelude 库}
-\input{Contents/Prelude Library}
-
-\chapter{Math 库}
-
-\chapter{Containers 库}
-\input{Contents/Containers Library}
-
-\chapter{System 库}
-
-
 \part{高级知识}
 
 \chapter{名字空间与模块}
 \input{Contents/Namespaces and Modules}
 
-\chapter{单子与异常处理}
-\input{Contents/Monads and Error Handling}
+\chapter{异常处理与单子}
+\input{Contents/Error Handling and Monads}
 
-\chapter{动态类型与子类型系统}
-\input{Contents/Dynamic Types}
+%\chapter{动态类型与子类型系统}
+%\input{Contents/Dynamic Types}
 
 \chapter{模版与元编程}
 \input{Contents/Templates and Metaprogramming}
 
-\chapter{AutoScript 编译器}
-\input{Contents/AutoScript Compiler}
+%\chapter{AutoScript 编译器}
+%\input{Contents/AutoScript Compiler}
+
+
+%\part{AutoScript 标准库}
+
+%\chapter{Prelude 库}
+%\input{Contents/Prelude Library}
+
+%\chapter{Math 库}
+
+%\chapter{Containers 库}
+%\input{Contents/Containers Library}
+
+%\chapter{System 库}
+
 
 \appendix
-\part{附录}
-\input{Contents/Appendix}
+%\part{附录}
+%\input{Contents/Appendix}
 
 
 \end{document}
