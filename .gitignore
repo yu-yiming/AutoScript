@@ -6,3 +6,5 @@
 *.gz
 *.toc
 **/.DS_Store
+Compiler/.vscode/
+syntax-highlighting.monarch.ts
